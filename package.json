@@ -14,18 +14,11 @@
     "lisp"
   ],
   "rebel": {
-    "ocamlfindDependencies": [
-      "core"
-    ],
     "targets": [
       {
         "target": "default",
         "engine": "native",
-        "entry": "src/Index.re",
-        "unstable_flags": {
-          "link": "-thread",
-          "compile": "-thread"
-        }
+        "entry": "src/Index.re"
       }
     ]
   },

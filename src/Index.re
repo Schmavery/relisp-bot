@@ -1,4 +1,6 @@
-open Result;
+type result 'a 'b =
+  | Ok 'a
+  | Error 'b;
 
 type uuidT = string;
 
