@@ -35,12 +35,9 @@ let gen_uuid () => {
   s4 () ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
 };
 
-let try' e =>
-  try (Some e) {
+let stringmap_get key map => try (Some (StringMap.find key map)){
   | _ => None
-  };
-
-let stringmap_get key map => try' (StringMap.find key map);
+};
 
 let stringmap_union m1 m2 =>
   StringMap.merge

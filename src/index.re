@@ -7,36 +7,39 @@ open Evaluate;
 let state: Eval.t = Eval.empty;
 
 /* Define Builtins */
-let do_operation (op: float => float => float) (op_name: string) (state:Eval.t) :Eval.t =>
+let do_operation (op: float => float => float) (op_name: string) (state: Eval.t) :Eval.t =>
   Eval.add_native_lambda
     op_name
     state::state
-    false
+    macro::false
     (
-      fun args ctx::ctx state::state => (
-        switch args {
-        | [] => create_exception ("Called '" ^ op_name ^ "' with no args.")
-        | [{value: Num _ as hd}, ...tl] =>
-          let res =
-            List.fold_left
-              (
-                fun acc v =>
-                  switch (acc, v) {
-                  | (Ok (Num acc_num), {value: Num x}) => Ok (Num (op acc_num x))
-                  | (Error _ as ex, _) => ex
-                  | _ => create_exception ("Called '" ^ op_name ^ "' with something not a number.")
-                  }
-              )
-              (Ok hd)
-              tl;
-          switch res {
-          | Ok v => Ok (create_node v)
-          | Error e => Error e
-          }
-        | _ => create_exception ("Called '" ^ op_name ^ "' with something not a number.")
-        },
-        state
-      )
+      fun args ctx::ctx state::state => {
+        (
+          switch args {
+          | [] => create_exception ("Called '" ^ op_name ^ "' with no args.")
+          | [{value: Num _ as hd}, ...tl] =>
+            let res =
+              List.fold_left
+                (
+                  fun acc v =>
+                    switch (acc, v) {
+                    | (Ok (Num acc_num), {value: Num x}) => Ok (Num (op acc_num x))
+                    | (Error _ as ex, _) => ex
+                    | _ =>
+                      create_exception ("Called '" ^ op_name ^ "' with something not a number.")
+                    }
+                )
+                (Ok hd)
+                tl;
+            switch res {
+            | Ok v => Ok (create_node v)
+            | Error e => Error e
+            }
+          | _ => create_exception ("Called '" ^ op_name ^ "' with something not a number.")
+          },
+          state
+        )
+      }
     );
 
 let state = do_operation (+.) "+" state;
@@ -86,7 +89,7 @@ let state =
   Eval.add_native_lambda
     state::state
     "lambda"
-    true
+    macro::true
     (
       fun args ctx::ctx state::state => {
         let uuid = gen_uuid ();
@@ -139,7 +142,7 @@ let state =
   Eval.add_native_lambda
     state::state
     "throw"
-    false
+    macro::false
     (
       fun args ctx::ctx state::state => (
         switch args {
@@ -156,7 +159,7 @@ let state =
   Eval.add_native_lambda
     state::state
     "try"
-    true
+    macro::true
     (
       fun args ctx::ctx state::state =>
         switch args {
@@ -182,6 +185,47 @@ let state =
           )
         }
     );
+
+let state =
+  Eval.add_native_lambda
+    state::state
+    "define"
+    macro::true
+    (
+      fun args ctx::ctx state::state =>
+        switch args {
+        | [] => (create_exception "Received no arguments, expected 2 in call to 'define'", state)
+        | [{value: Ident ident}, other] =>
+          if (Eval.is_reserved state ident) {
+            switch (Eval.eval other ctx::ctx state::state) {
+            | (Ok {value: NativeFunc _}, _) => (
+                create_exception ("Cannot rename builtin function [" ^ ident ^ "]."),
+                state
+              )
+            | (Ok res, state) =>
+              switch (Eval.define_symbol state ident res) {
+              | Some state => (Ok Eval.empty_node, state)
+              | None => (create_exception "Can only define at the top level", state)
+              }
+            | (Error _, _) as e => e
+            }
+          } else {
+            (create_exception ("Cannot define reserved keyword [" ^ ident ^ "]."), state)
+          }
+        | [_, _] => (
+            create_exception "Expected ident as first argument in call to 'define'",
+            state
+          )
+        | lst =>
+          let received = string_of_int (List.length lst);
+          (
+            create_exception ("Received " ^ received ^ " arguments, expected 2 in call to 'catch'"),
+            state
+          )
+        }
+    );
+
+/* let state = Eval.add_native_lambda state::state "quote" macro::true (fun args ctx::ctx state::state); */
 
 let rec main (state: Eval.t) => {
   let in_str = input_line stdin;

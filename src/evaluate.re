@@ -3,9 +3,12 @@ open Common;
 module type EvalT = {
   type t = evaluationStateT;
   let empty: t;
+  let empty_node: astNodeT;
   let is_macro: astNodeT => bool;
-  let add_native_lambda: string => bool => nativeFuncT => state::t => t;
+  let add_native_lambda: string => macro::bool => nativeFuncT => state::t => t;
+  let define_symbol: t => string => astNodeT => option t;
   let resolve_ident: string => ctxT => t => option astNodeT;
+  let is_reserved: t => string => bool;
   let add_to_uuid_map: t => astNodeT => t;
   let eval: astNodeT => ctx::ctxT => state::t => (result astNodeT astNodeT, t);
   let eval_lambda:
@@ -21,6 +24,7 @@ let module Eval: EvalT = {
   type t = evaluationStateT;
   let trueNode = {uuid: gen_uuid (), value: Bool true};
   let falseNode = {uuid: gen_uuid (), value: Bool false};
+  let empty_node = {uuid: gen_uuid (), value: List []};
   let max_stack = 512;
   let empty: t = {
     localStack: [StringMap.empty],
@@ -35,7 +39,12 @@ let module Eval: EvalT = {
     };
 
   /****/
-  let add_native_lambda (name: string) (is_macro: bool) (func: nativeFuncT) state::(state: t) :t => {
+  let add_native_lambda
+      (name: string)
+      macro::(is_macro: bool)
+      (func: nativeFuncT)
+      state::(state: t)
+      :t => {
     let node = create_node (NativeFunc {func, is_macro});
     {...state, symbolTable: StringMap.add name node state.symbolTable}
   };
@@ -47,26 +56,43 @@ let module Eval: EvalT = {
   };
 
   /****/
-  let resolve_ident (ident_name: string) (ctx: ctxT) (state: t) :option astNodeT => {
-    let uuid = stringmap_get ident_name state.symbolTable;
-    switch uuid {
+  let is_reserved state ident_name => stringmap_get ident_name state.symbolTable == None;
+
+  /****/
+  let define_symbol (state: t) (ident_name: string) (node: astNodeT) :option t =>
+    switch state.localStack {
+    | [top, map] =>
+      Some {
+        ...state,
+        localStack: [top, StringMap.add ident_name node.uuid map],
+        uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
+      }
+    /* | lst => print_endline (string_of_int (List.length lst)); */
+    | _ => None
+    };
+
+  /****/
+  let resolve_ident (ident_name: string) (ctx: ctxT) (state: t) :option astNodeT =>
+    switch (stringmap_get ident_name state.symbolTable) {
     | Some x => Some x
     | None =>
-      let uuid = stringmap_get ident_name (List.hd state.localStack);
-      switch uuid {
-      | Some x =>
-        switch (stringmap_get x state.uuidToNodeMap) {
-        | Some x => Some x
-        | None =>
-          switch (stringmap_get x ctx.argsUuidMap) {
+      switch state.localStack {
+      | [hd, ..._] =>
+        switch (stringmap_get ident_name hd) {
+        | Some x =>
+          switch (stringmap_get x state.uuidToNodeMap) {
           | Some x => Some x
-          | None => failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
+          | None =>
+            switch (stringmap_get x ctx.argsUuidMap) {
+            | Some x => Some x
+            | None => failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
+            }
           }
+        | None => None
         }
-      | None => None
+      | [] => failwith "averys dumb"
       }
-    }
-  };
+    };
   let rec create_lambda_arg_map
           (func_args: list string)
           (passed_args: list astNodeT)
