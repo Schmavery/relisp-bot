@@ -94,11 +94,11 @@ let state =
       fun args ctx::ctx state::state => {
         let uuid = gen_uuid ();
         switch args {
-        | [{value: List args}, {value: List _} as body] =>
+        | [{value: List args}, body] =>
           let arg_names =
-            List.fold_left
+            List.fold_right
               (
-                fun acc v =>
+                fun v acc =>
                   switch acc {
                   | Ok a =>
                     switch v {
@@ -108,8 +108,8 @@ let state =
                   | x => x
                   }
               )
-              (Ok [])
-              args;
+              args
+              (Ok []);
           switch arg_names {
           | Error e => (create_exception e, state)
           | Ok names =>
@@ -125,7 +125,7 @@ let state =
             | Error e => (create_exception e, state)
             }
           }
-        | [_, _] => (create_exception "Expected 2 lists in call to 'lambda'", state)
+        | [_, _] => (create_exception "Expected list as first argument in call to 'lambda'", state)
         | _ =>
           let received = string_of_int (List.length args);
           (

@@ -61,13 +61,12 @@ let module Eval: EvalT = {
   /****/
   let define_symbol (state: t) (ident_name: string) (node: astNodeT) :option t =>
     switch state.localStack {
-    | [top, map] =>
+    | [top, map] => /* map is the top level scope, top is the scope for the "define" */
       Some {
         ...state,
         localStack: [top, StringMap.add ident_name node.uuid map],
         uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
       }
-    /* | lst => print_endline (string_of_int (List.length lst)); */
     | _ => None
     };
 
@@ -100,7 +99,7 @@ let module Eval: EvalT = {
           :result (StringMap.t astNodeT) string =>
     switch (func_args, passed_args) {
     | ([], []) => Ok map
-    | ([ident, "..."], rest) => Ok (StringMap.add ident {uuid: gen_uuid (), value: List rest} map)
+    | (["...", ident], rest) => Ok (StringMap.add ident {uuid: gen_uuid (), value: List rest} map)
     | ([ident, ...tl1], [value, ...tl2]) =>
       create_lambda_arg_map tl1 tl2 (StringMap.add ident value map)
     | ([], rest) =>
@@ -108,7 +107,7 @@ let module Eval: EvalT = {
       let received = expected + List.length rest;
       Error (
         "Expected " ^
-        string_of_int expected ^ "arguments, received " ^ string_of_int received ^ "arguments."
+        string_of_int expected ^ " arguments, received " ^ string_of_int received ^ " arguments."
       )
     | (rest, []) =>
       let received = StringMap.cardinal map;
@@ -121,7 +120,7 @@ let module Eval: EvalT = {
         ) + received;
       Error (
         "Expected " ^
-        string_of_int expected ^ "arguments, received " ^ string_of_int received ^ "arguments."
+        string_of_int expected ^ " arguments, received " ^ string_of_int received ^ " arguments."
       )
     };
   let push_stack state el :t => {...state, localStack: [el, ...state.localStack]};
@@ -222,10 +221,10 @@ let module Eval: EvalT = {
       (Ok args, state)
     } else {
       /* Eval args, accounting for exceptions */
-      List.fold_left
+      List.fold_right
         (
-          fun maybe_acc e =>
-            switch maybe_acc {
+          fun e acc =>
+            switch acc {
             | (Ok acc, state) =>
               switch (eval ctx::ctx e state::state) {
               | (Ok x, state) => (Ok [x, ...acc], state)
@@ -234,7 +233,7 @@ let module Eval: EvalT = {
             | x => x
             }
         )
-        (Ok [], state)
         args
+        (Ok [], state)
     };
 };
