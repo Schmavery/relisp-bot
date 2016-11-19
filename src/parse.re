@@ -65,9 +65,10 @@ let parse s => {
     switch (Stream.peek stream) {
     | Some c when is_num c => parse_num (Stream.pop stream) (acc ^ String.make 1 c)
     | _ =>
-      let num = try (Some (float_of_string acc)) {
+      let num =
+        try (Some (float_of_string acc)) {
         | _ => None
-      };
+        };
       switch num {
       | Some f => ParseOk (stream, create_node (Num f))
       | None => ParseFail ("Could not parse number [" ^ acc ^ "].")

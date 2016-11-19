@@ -5,10 +5,11 @@ module type EvalT = {
   let empty: t;
   let empty_node: astNodeT;
   let is_macro: astNodeT => bool;
-  let add_native_lambda: string => macro::bool => nativeFuncT => state::t => t;
-  let define_symbol: t => string => astNodeT => option t;
+  let create_initial_context: t => ctxT;
+  let define_native_symbol: t => string => astNodeT => t;
+  let define_user_symbol: t => string => astNodeT => t;
   let resolve_ident: string => ctxT => t => option astNodeT;
-  let is_reserved: t => string => bool;
+  let is_reserved_symbol: t => string => bool;
   let add_to_uuid_map: t => astNodeT => t;
   let eval: astNodeT => ctx::ctxT => state::t => (result astNodeT astNodeT, t);
   let eval_lambda:
@@ -27,7 +28,7 @@ let module Eval: EvalT = {
   let empty_node = {uuid: gen_uuid (), value: List []};
   let max_stack = 512;
   let empty: t = {
-    localStack: [StringMap.empty],
+    userTable: StringMap.empty,
     uuidToNodeMap: StringMap.empty,
     symbolTable: StringMap.empty
   };
@@ -38,60 +39,56 @@ let module Eval: EvalT = {
     | _ => false
     };
 
-  /****/
-  let add_native_lambda
-      (name: string)
-      macro::(is_macro: bool)
-      (func: nativeFuncT)
-      state::(state: t)
-      :t => {
-    let node = create_node (NativeFunc {func, is_macro});
-    {...state, symbolTable: StringMap.add name node state.symbolTable}
+  /***/
+  let create_initial_context state => {
+    argsUuidMap: StringMap.empty,
+    argsTable: state.userTable,
+    depth: 0
   };
 
-  /****/
+  /***/
   let add_to_uuid_map (state: t) (node: astNodeT) :t => {
     ...state,
     uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
   };
 
-  /****/
-  let is_reserved state ident_name => stringmap_get ident_name state.symbolTable == None;
+  /***/
+  let is_reserved_symbol state ident_name => stringmap_get ident_name state.symbolTable == None;
+  let define_native_symbol (state: t) (ident_name: string) (node: astNodeT) :t => {
+    ...state,
+    symbolTable: StringMap.add ident_name node.uuid state.symbolTable,
+    uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
+  };
 
-  /****/
-  let define_symbol (state: t) (ident_name: string) (node: astNodeT) :option t =>
-    switch state.localStack {
-    | [top, map] => /* map is the top level scope, top is the scope for the "define" */
-      Some {
-        ...state,
-        localStack: [top, StringMap.add ident_name node.uuid map],
-        uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
-      }
-    | _ => None
-    };
+  /***/
+  let define_user_symbol (state: t) (ident_name: string) (node: astNodeT) :t => {
+    ...state,
+    userTable: StringMap.add ident_name node.uuid state.userTable,
+    uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
+  };
 
-  /****/
-  let resolve_ident (ident_name: string) (ctx: ctxT) (state: t) :option astNodeT =>
-    switch (stringmap_get ident_name state.symbolTable) {
-    | Some x => Some x
-    | None =>
-      switch state.localStack {
-      | [hd, ..._] =>
-        switch (stringmap_get ident_name hd) {
-        | Some x =>
-          switch (stringmap_get x state.uuidToNodeMap) {
-          | Some x => Some x
-          | None =>
-            switch (stringmap_get x ctx.argsUuidMap) {
-            | Some x => Some x
-            | None => failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
-            }
-          }
-        | None => None
+  /***/
+  let resolve_ident (ident_name: string) (ctx: ctxT) (state: t) :option astNodeT => {
+    let uuid =
+      switch (stringmap_get ident_name state.symbolTable) {
+      | Some _ as uuid => uuid
+      | None => stringmap_get ident_name ctx.argsTable
+      };
+    switch uuid {
+    | None => None
+    | Some x =>
+      switch (stringmap_get x state.uuidToNodeMap) {
+      | Some x => Some x
+      | None =>
+        switch (stringmap_get x ctx.argsUuidMap) {
+        | Some x => Some x
+        | None => failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
         }
-      | [] => failwith "averys dumb"
       }
-    };
+    }
+  };
+
+  /***/
   let rec create_lambda_arg_map
           (func_args: list string)
           (passed_args: list astNodeT)
@@ -123,11 +120,6 @@ let module Eval: EvalT = {
         string_of_int expected ^ " arguments, received " ^ string_of_int received ^ " arguments."
       )
     };
-  let push_stack state el :t => {...state, localStack: [el, ...state.localStack]};
-  let pop_stack (node, state) :(result astNodeT astNodeT, t) => (
-    node,
-    {...state, localStack: List.tl state.localStack}
-  );
 
   /** Mutually recursive main eval logic **/
   let rec eval
@@ -179,15 +171,14 @@ let module Eval: EvalT = {
       ctx::(ctx: ctxT)
       state::state
       :(result astNodeT astNodeT, t) =>
-    if (List.length state.localStack > max_stack) {
+    if (ctx.depth > max_stack) {
       (create_exception ("Stack overflow > " ^ string_of_int max_stack), state)
     } else {
       let maybe_args = eval_args called_func args ctx state;
       switch func_value {
       | NativeFunc native =>
         switch maybe_args {
-        | (Ok args, state) =>
-          pop_stack (native.func args ctx::ctx state::(push_stack state StringMap.empty))
+        | (Ok args, state) => native.func args ctx::{...ctx, depth: ctx.depth + 1} state::state
         | (Error _, _) as e => e
         }
       | Func {func, args, scope, is_macro} =>
@@ -197,14 +188,13 @@ let module Eval: EvalT = {
           switch arg_to_node_map {
           | Error e => (create_exception e, state)
           | Ok map =>
-            let ctx = {
-              argsUuidMap:
-                StringMap.fold
-                  (fun key value acc => StringMap.add value.uuid value acc) map ctx.argsUuidMap
-            };
+            let argsUuidMap =
+              StringMap.fold
+                (fun key value acc => StringMap.add value.uuid value acc) map ctx.argsUuidMap;
             let arg_map = StringMap.map (fun value => value.uuid) map;
-            let stack_frame = stringmap_union arg_map scope;
-            pop_stack (eval func ctx::ctx state::(push_stack state stack_frame))
+            let argsTable = stringmap_union arg_map scope;
+            let ctx = {...ctx, argsUuidMap, argsTable};
+            eval func ctx::ctx state::state
           }
         | (Error _, _) as e => e
         }

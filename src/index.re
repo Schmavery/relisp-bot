@@ -6,40 +6,47 @@ open Evaluate;
 
 let state: Eval.t = Eval.empty;
 
+let add_native_lambda
+    (name: string)
+    macro::(is_macro: bool)
+    (func: nativeFuncT)
+    state::(state: Eval.t)
+    :Eval.t => {
+  let node = create_node (NativeFunc {func, is_macro});
+  Eval.define_native_symbol state name node
+};
+
 /* Define Builtins */
 let do_operation (op: float => float => float) (op_name: string) (state: Eval.t) :Eval.t =>
-  Eval.add_native_lambda
+  add_native_lambda
     op_name
     state::state
     macro::false
     (
-      fun args ctx::ctx state::state => {
-        (
-          switch args {
-          | [] => create_exception ("Called '" ^ op_name ^ "' with no args.")
-          | [{value: Num _ as hd}, ...tl] =>
-            let res =
-              List.fold_left
-                (
-                  fun acc v =>
-                    switch (acc, v) {
-                    | (Ok (Num acc_num), {value: Num x}) => Ok (Num (op acc_num x))
-                    | (Error _ as ex, _) => ex
-                    | _ =>
-                      create_exception ("Called '" ^ op_name ^ "' with something not a number.")
-                    }
-                )
-                (Ok hd)
-                tl;
-            switch res {
-            | Ok v => Ok (create_node v)
-            | Error e => Error e
-            }
-          | _ => create_exception ("Called '" ^ op_name ^ "' with something not a number.")
-          },
-          state
-        )
-      }
+      fun args ctx::ctx state::state => (
+        switch args {
+        | [] => create_exception ("Called '" ^ op_name ^ "' with no args.")
+        | [{value: Num _ as hd}, ...tl] =>
+          let res =
+            List.fold_left
+              (
+                fun acc v =>
+                  switch (acc, v) {
+                  | (Ok (Num acc_num), {value: Num x}) => Ok (Num (op acc_num x))
+                  | (Error _ as ex, _) => ex
+                  | _ => create_exception ("Called '" ^ op_name ^ "' with something not a number.")
+                  }
+              )
+              (Ok hd)
+              tl;
+          switch res {
+          | Ok v => Ok (create_node v)
+          | Error e => Error e
+          }
+        | _ => create_exception ("Called '" ^ op_name ^ "' with something not a number.")
+        },
+        state
+      )
     );
 
 let state = do_operation (+.) "+" state;
@@ -86,7 +93,7 @@ let rec create_lambda_scope
   };
 
 let state =
-  Eval.add_native_lambda
+  add_native_lambda
     state::state
     "lambda"
     macro::true
@@ -139,7 +146,7 @@ let state =
     );
 
 let state =
-  Eval.add_native_lambda
+  add_native_lambda
     state::state
     "throw"
     macro::false
@@ -156,7 +163,7 @@ let state =
     );
 
 let state =
-  Eval.add_native_lambda
+  add_native_lambda
     state::state
     "try"
     macro::true
@@ -187,7 +194,7 @@ let state =
     );
 
 let state =
-  Eval.add_native_lambda
+  add_native_lambda
     state::state
     "define"
     macro::true
@@ -196,21 +203,21 @@ let state =
         switch args {
         | [] => (create_exception "Received no arguments, expected 2 in call to 'define'", state)
         | [{value: Ident ident}, other] =>
-          if (Eval.is_reserved state ident) {
+          if (ctx.depth > 2) {
+            (create_exception "Can only define at the top level", state)
+          } else if (
+            not (Eval.is_reserved_symbol state ident)
+          ) {
+            (create_exception ("Cannot define reserved keyword [" ^ ident ^ "]."), state)
+          } else {
             switch (Eval.eval other ctx::ctx state::state) {
             | (Ok {value: NativeFunc _}, _) => (
                 create_exception ("Cannot rename builtin function [" ^ ident ^ "]."),
                 state
               )
-            | (Ok res, state) =>
-              switch (Eval.define_symbol state ident res) {
-              | Some state => (Ok Eval.empty_node, state)
-              | None => (create_exception "Can only define at the top level", state)
-              }
+            | (Ok res, state) => (Ok Eval.empty_node, Eval.define_user_symbol state ident res)
             | (Error _, _) as e => e
             }
-          } else {
-            (create_exception ("Cannot define reserved keyword [" ^ ident ^ "]."), state)
           }
         | [_, _] => (
             create_exception "Expected ident as first argument in call to 'define'",
@@ -225,14 +232,12 @@ let state =
         }
     );
 
-/* let state = Eval.add_native_lambda state::state "quote" macro::true (fun args ctx::ctx state::state); */
-
 let rec main (state: Eval.t) => {
   let in_str = input_line stdin;
   if (in_str != "exit") {
     switch (parse in_str) {
     | Ok e =>
-      let (res, state) = Eval.eval e ctx::{argsUuidMap: StringMap.empty} state::state;
+      let (res, state) = Eval.eval e ctx::(Eval.create_initial_context state) state::state;
       string_of_ast res |> print_endline;
       main state
     | Error _ as e =>
