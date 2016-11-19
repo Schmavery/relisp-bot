@@ -193,7 +193,7 @@ let module Eval: EvalT = {
                 (fun key value acc => StringMap.add value.uuid value acc) map ctx.argsUuidMap;
             let arg_map = StringMap.map (fun value => value.uuid) map;
             let argsTable = stringmap_union arg_map scope;
-            let ctx = {...ctx, argsUuidMap, argsTable};
+            let ctx = {depth: ctx.depth + 1, argsUuidMap, argsTable};
             eval func ctx::ctx state::state
           }
         | (Error _, _) as e => e
