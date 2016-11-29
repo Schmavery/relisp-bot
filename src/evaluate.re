@@ -90,23 +90,26 @@ let module Eval: EvalT = {
 
   /***/
   let rec create_lambda_arg_map
+          (vararg: option string)
           (func_args: list string)
           (passed_args: list astNodeT)
           (map: StringMap.t astNodeT)
           :result (StringMap.t astNodeT) string =>
-    switch (func_args, passed_args) {
-    | ([], []) => Ok map
-    | (["...", ident], rest) => Ok (StringMap.add ident {uuid: gen_uuid (), value: List rest} map)
-    | ([ident, ...tl1], [value, ...tl2]) =>
-      create_lambda_arg_map tl1 tl2 (StringMap.add ident value map)
-    | ([], rest) =>
+    switch (func_args, passed_args, vararg) {
+    | ([], [], None) => Ok map
+    | ([], rest, Some vararg) =>
+      Ok (StringMap.add vararg {uuid: gen_uuid (), value: List rest} map)
+    | ([ident, ...tl1], [value, ...tl2], _) =>
+      create_lambda_arg_map vararg tl1 tl2 (StringMap.add ident value map)
+    | ([], rest, None) =>
       let expected = StringMap.cardinal map;
       let received = expected + List.length rest;
       Error (
         "Expected " ^
         string_of_int expected ^ " arguments, received " ^ string_of_int received ^ " arguments."
       )
-    | (rest, []) =>
+    | (rest, [], None)
+    | (rest, [], Some _) =>
       let received = StringMap.cardinal map;
       let expected =
         (
@@ -181,10 +184,10 @@ let module Eval: EvalT = {
         | (Ok args, state) => native.func args ctx::{...ctx, depth: ctx.depth + 1} state::state
         | (Error _, _) as e => e
         }
-      | Func {func, args, scope, is_macro} =>
+      | Func ({func, args, scope, is_macro, vararg}) =>
         switch maybe_args {
         | (Ok passed_args, state) =>
-          let arg_to_node_map = create_lambda_arg_map args passed_args StringMap.empty;
+          let arg_to_node_map = create_lambda_arg_map vararg args passed_args StringMap.empty;
           switch arg_to_node_map {
           | Error e => (create_exception e, state)
           | Ok map =>

@@ -7,7 +7,13 @@ type uuidT = string;
 let module StringMap = Map.Make String;
 
 type astNodeT = {uuid: uuidT, value: valueT}
-and funcT = {func: astNodeT, args: list string, scope: StringMap.t string, is_macro: bool}
+and funcT = {
+  func: astNodeT,
+  args: list string,
+  vararg: option string,
+  scope: StringMap.t string,
+  is_macro: bool
+}
 and nativeFuncT =
   list astNodeT =>
   ctx::ctxT =>
@@ -57,18 +63,37 @@ let create_node value => {uuid: gen_uuid (), value};
 
 let create_exception text => Error (create_node (Str text));
 
-let rec string_of_ast (ast: result astNodeT astNodeT) :string =>
+let rec string_of_ast (ast: result astNodeT astNodeT) :string => {
+  let string_of_func (f: funcT) => {
+    let title =
+      if f.is_macro {
+        "Macro"
+      } else {
+        "Function"
+      };
+    let arg_list =
+      switch f.vararg {
+      | Some vararg_name => f.args @ ["... " ^ vararg_name]
+      | None => f.args
+      };
+    let args = String.concat ", " arg_list;
+    let body = string_of_ast (Ok f.func);
+    "[" ^ title ^ ": " ^ args ^ " => " ^ body ^ "]"
+  };
   switch ast {
   | Ok value =>
     switch value.value {
-    | Ident x => "[" ^ x ^ "]"
+    | Ident x => x
     | Str x => "'" ^ x ^ "'"
     | Num x => string_of_float x
     | Bool x => string_of_bool x
     | Ref _ => "[Ref]"
     | List x => "(" ^ (List.map (fun v => string_of_ast (Ok v)) x |> String.concat " ") ^ ")"
-    | Func _ => "[Function]"
-    | NativeFunc _ => "[Native Function]"
+    | Func ({is_macro: false} as f) => string_of_func f
+    | Func ({is_macro: true} as f) => string_of_func f
+    | NativeFunc {is_macro: false} => "[Native Function]"
+    | NativeFunc {is_macro: true} => "[Native Macro]"
     }
   | Error ex => "[Exception of " ^ string_of_ast (Ok ex) ^ "]"
-  };
+  }
+};

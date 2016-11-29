@@ -81,7 +81,8 @@ let parse s => {
     | Some '"' => parse_string (Stream.pop stream) ""
     | Some '(' => parse_list (Stream.pop stream) []
     | Some ' '
-    | Some '\n' => parse (Stream.pop stream)
+    | Some '\t'
+    | Some '\n' => print_endline "popped space"; parse (Stream.pop stream)
     | Some c when is_num c => parse_num stream ""
     | Some c => parse_ident stream ""
     | None => UnexpectedEnd
@@ -89,6 +90,9 @@ let parse s => {
   and parse_list (stream: Stream.t) (acc: list astNodeT) :parseResult =>
     switch (Stream.peek stream) {
     | Some ')' => ParseOk (Stream.pop stream, create_node (List (List.rev acc)))
+    | Some ' '
+    | Some '\t'
+    | Some '\n' => parse_list (Stream.pop stream) acc
     | Some c =>
       switch (parse stream) {
       | ParseOk (res_stream, res) => parse_list res_stream [res, ...acc]

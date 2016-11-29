@@ -92,58 +92,50 @@ let rec create_lambda_scope
   | _ => Error "Found non-literal in lambda body."
   };
 
-let state =
-  add_native_lambda
-    state::state
-    "lambda"
-    macro::true
-    (
-      fun args ctx::ctx state::state => {
-        let uuid = gen_uuid ();
-        switch args {
-        | [{value: List args}, body] =>
-          let arg_names =
-            List.fold_right
-              (
-                fun v acc =>
-                  switch acc {
-                  | Ok a =>
-                    switch v {
-                    | {value: Ident ident} => Ok [ident, ...a]
-                    | _ => Error "Argument defined as not identifier in 'lambda'"
-                    }
-                  | x => x
-                  }
-              )
-              args
-              (Ok []);
-          switch arg_names {
-          | Error e => (create_exception e, state)
-          | Ok names =>
-            switch (create_lambda_scope body (StringMap.singleton "recur" uuid) names ctx state) {
-            | Ok (idents, new_state) =>
-              let node = {
-                uuid,
-                value: Func {func: body, args: names, scope: idents, is_macro: false}
-              };
-              /* add recur uuid */
-              let new_state = Eval.add_to_uuid_map new_state node;
-              (Ok node, new_state)
-            | Error e => (create_exception e, state)
-            }
-          }
-        | [_, _] => (create_exception "Expected list as first argument in call to 'lambda'", state)
-        | _ =>
-          let received = string_of_int (List.length args);
-          (
-            create_exception (
-              "Received " ^ received ^ " arguments, expected 2 in call to 'lambda'"
-            ),
-            state
-          )
-        }
+let rec parse_lambda_args
+        (args: list astNodeT)
+        (acc: list string)
+        :result (list string, option string) string =>
+  switch args {
+  | [] => Ok (List.rev acc, None)
+  | [{value: Ident "..."}, {value: Ident vararg}] => Ok (List.rev acc, Some vararg)
+  | [{value: Ident "..."}, ...tl] => Error "Can only have ... before the last argument name."
+  | [{value: Ident ident}, ...tl] => parse_lambda_args tl [ident, ...acc]
+  | _ => Error "Argument defined as not identifier in function definition."
+  };
+
+let parse_lambda_args args => parse_lambda_args args [];
+
+let create_lambda_func is_macro args ctx::ctx state::state => {
+  let uuid = gen_uuid ();
+  switch args {
+  | [{value: List args}, body] =>
+    let arg_names = parse_lambda_args args;
+    switch arg_names {
+    | Error e => (create_exception e, state)
+    | Ok (names, vararg) =>
+      switch (create_lambda_scope body (StringMap.singleton "recur" uuid) names ctx state) {
+      | Ok (idents, new_state) =>
+        let node = {uuid, value: Func {func: body, args: names, scope: idents, is_macro, vararg}};
+        /* add recur uuid */
+        let new_state = Eval.add_to_uuid_map new_state node;
+        (Ok node, new_state)
+      | Error e => (create_exception e, state)
       }
-    );
+    }
+  | [_, _] => (create_exception "Expected list as first argument in call to 'lambda'", state)
+  | _ =>
+    let received = string_of_int (List.length args);
+    (
+      create_exception ("Received " ^ received ^ " arguments, expected 2 in call to 'lambda'"),
+      state
+    )
+  }
+};
+
+let state = add_native_lambda state::state "lambda" macro::true (create_lambda_func false);
+
+let state = add_native_lambda state::state "macro" macro::true (create_lambda_func true);
 
 let state =
   add_native_lambda
@@ -232,6 +224,71 @@ let state =
         }
     );
 
+let state =
+  add_native_lambda
+    state::state
+    "quote"
+    macro::true
+    (
+      fun args ctx::ctx state::state =>
+        switch args {
+        | [el] => (Ok el, state)
+        | lst =>
+          let received = string_of_int (List.length lst);
+          (
+            create_exception ("Received " ^ received ^ " arguments, expected 1 in call to 'quote'"),
+            state
+          )
+        }
+    );
+
+let state =
+  add_native_lambda
+    state::state
+    "unquote"
+    macro::true
+    (
+      fun args ctx::ctx state::state =>
+        switch args {
+        | [el] => Eval.eval el ctx::ctx state::state
+        | lst =>
+          let received = string_of_int (List.length lst);
+          (
+            create_exception (
+              "Received " ^ received ^ " arguments, expected 1 in call to 'unquote'"
+            ),
+            state
+          )
+        }
+    );
+
+/*
+ "syntax-quote": function(args) {
+   var traverse = function(node) {
+     if(node.type !== "list") return node;
+
+     if(node.value.length > 0 && node.value[0].value === "unquote") {
+       return evaluate(node.value[1]);
+     }
+
+     var newTree:listT = makeArr();
+     for (var i = 0; i < node.value.length; i++) {
+       if((node.value[i].type !== "list") && node.value[i].value.length > 0 && node.value[i].value[0].value === "unquote-splice") {
+
+         var evaledExpr = evaluate(node.value[i].value[1]);
+         if (evaledExpr.type === "list"){
+           newTree.value = newTree.value.concat(evaledExpr.value);
+         } else {
+           throw new Error("Unquote splice only applies to lists.");
+         }
+
+       } else newTree.value.push(traverse(node.value[i]));
+     }
+
+     return newTree;
+   };
+   return traverse(args[0]);
+ },*/
 let rec main (state: Eval.t) => {
   let in_str = input_line stdin;
   if (in_str != "exit") {
