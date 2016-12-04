@@ -30,8 +30,6 @@ let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 
 Random.self_init ();
 
-
-
 let process_input (in_str: string) (state: Eval.t) :(string, Eval.t) =>
   switch (parse in_str) {
   | Ok e =>
@@ -53,19 +51,49 @@ let add_console_element inner_text => {
 
 let state = ref (Builtins.add_builtins Eval.empty);
 
+let history: ref (list string) = ref [];
+
+let position = ref 0;
+
+let moveHistory (by: int) :option string => {
+  let new_pos = !position + by;
+  if (new_pos < 1 || new_pos > List.length !history) {
+    None
+  } else {
+    position := new_pos;
+    Some (List.nth !history (new_pos - 1))
+  }
+};
+
 setOnKeyDown
   input_element
   (
     fun e =>
-      if (getKeyCode e == 13) {
+      switch (getKeyCode e) {
+      | 13 =>
         let in_str = getValue input_element;
+        history := [in_str, ...!history];
+        position := 0;
         let (out_str, new_state) = process_input in_str !state;
         state := new_state;
         setValue input_element "";
         add_console_element ("> " ^ in_str);
         add_console_element out_str;
         Js.false_
-      } else {
-        Js.true_
+      | 38 /* UpArrow */ =>
+        switch (moveHistory 1) {
+        | Some line =>
+          setValue input_element line;
+          Js.false_
+        | None => Js.false_
+        }
+      | 40 /* DownArrow */ =>
+        switch (moveHistory (-1)) {
+        | Some line =>
+          setValue input_element line;
+          Js.false_
+        | None => Js.false_
+        }
+      | _ => Js.true_
       }
   );
