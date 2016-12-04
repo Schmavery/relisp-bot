@@ -18,7 +18,12 @@
       {
         "target": "default",
         "engine": "native",
-        "entry": "src/index.re"
+        "entry": "src/index_native.re"
+      },
+      {
+        "target": "web",
+        "engine": "bucklescript",
+        "entry": "src/index_web.re"
       }
     ]
   },
@@ -26,21 +31,26 @@
     "postinstall": "npm run build",
     "test": "_build/default/src/app.native",
     "start": "_build/default/src/app.native",
-    "build": "eval $(dependencyEnv) && nopam && rebel",
+    "build": "eval $(dependencyEnv) && nopam && rebel && browserify _build/web/src/index_web.js > assets/lisp.js",
     "top": "eval $(dependencyEnv) && rtop",
     "env": "eval $(dependencyEnv) && env",
     "editor": "eval $(dependencyEnv) && eval atom .",
+    "deploy": "node scripts/deploy-ghpages.js",
     "whereisocamlmerlin": "eval $(dependencyEnv) && which ocamlmerlin-reason"
   },
   "dependencies": {
-    "@opam-alpha/core": "^113.33.3",
     "@opam-alpha/merlin": "^ 2.5.0",
     "@opam-alpha/ocaml": "4.2.3",
+    "bs-platform": "https://github.com/bloomberg/bucklescript.git",
     "dependency-env": "https://github.com/reasonml/dependency-env.git",
     "nopam": "https://github.com/reasonml/nopam.git",
     "ocamlBetterErrors": "0.0.10",
     "realpath": "*",
     "reason": "https://github.com/facebook/reason.git",
     "rebel": "https://github.com/reasonml/rebel.git"
+  },
+  "devDependencies": {
+    "browserify": "^13.1.1",
+    "gh-pages": "^0.12.0"
   }
 }
