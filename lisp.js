@@ -25,7 +25,7 @@ function process_input(in_str, state) {
           ];
   }
   else {
-    var match = Curry._3(Web_Tar__Evaluate.Eval[/* eval */9], e[0], Curry._1(Web_Tar__Evaluate.Eval[/* create_initial_context */3], state), state);
+    var match = Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], e[0], Curry._1(Web_Tar__Evaluate.Eval[/* create_initial_context */5], state), state);
     return /* tuple */[
             Web_Tar__Common.string_of_ast(match[0]),
             match[1]
@@ -140,7 +140,7 @@ function add_builtins(state) {
               /* func */func,
               /* is_macro */is_macro
             ]]));
-    return Curry._3(Web_Tar__Evaluate.Eval[/* define_native_symbol */4], state, name, node);
+    return Curry._3(Web_Tar__Evaluate.Eval[/* define_native_symbol */6], state, name, node);
   };
   var do_operation = function (op, op_name, state) {
     return add_native_lambda(op_name, /* false */0, function (args, _, state) {
@@ -200,10 +200,10 @@ function add_builtins(state) {
     switch (match.tag | 0) {
       case 0 : 
           var i = match[0];
-          var match$1 = Curry._3(Web_Tar__Evaluate.Eval[/* resolve_ident */6], i, ctx, state);
+          var match$1 = Curry._3(Web_Tar__Evaluate.Eval[/* resolve_ident */8], i, ctx, state);
           if (match$1) {
             var x = match$1[0];
-            var new_state = Curry._2(Web_Tar__Evaluate.Eval[/* add_to_uuid_map */8], state, x);
+            var new_state = Curry._2(Web_Tar__Evaluate.Eval[/* add_to_uuid_map */10], state, x);
             return /* Ok */Block.__(0, [/* tuple */[
                         Curry._3(Web_Tar__Common.StringMap[/* add */3], i, x[/* uuid */0], map),
                         new_state
@@ -216,13 +216,6 @@ function add_builtins(state) {
                       ]]);
           }
           break;
-      case 1 : 
-      case 2 : 
-      case 3 : 
-          return /* Ok */Block.__(0, [/* tuple */[
-                      map,
-                      state
-                    ]]);
       case 5 : 
           return List.fold_left(function (acc, v) {
                       if (acc.tag) {
@@ -236,8 +229,15 @@ function add_builtins(state) {
                           map,
                           state
                         ]]), match[0]);
+      case 4 : 
+      case 6 : 
+      case 7 : 
+          return /* Error */Block.__(1, ["Found non-literal in lambda body."]);
       default:
-        return /* Error */Block.__(1, ["Found non-literal in lambda body."]);
+        return /* Ok */Block.__(0, [/* tuple */[
+                    map,
+                    state
+                  ]]);
     }
   };
   var parse_lambda_args = function (_args, _acc) {
@@ -334,7 +334,7 @@ function add_builtins(state) {
                   /* uuid */uuid,
                   node_001
                 ];
-                var new_state = Curry._2(Web_Tar__Evaluate.Eval[/* add_to_uuid_map */8], match$4[1], node);
+                var new_state = Curry._2(Web_Tar__Evaluate.Eval[/* add_to_uuid_map */10], match$4[1], node);
                 return /* tuple */[
                         /* Ok */Block.__(0, [node]),
                         new_state
@@ -410,10 +410,10 @@ function add_builtins(state) {
               exit = 1;
             }
             else {
-              var x = Curry._3(Web_Tar__Evaluate.Eval[/* eval */9], args[0], ctx, state);
+              var x = Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], args[0], ctx, state);
               var match$1 = x[0];
               if (match$1.tag) {
-                var match$2 = Curry._3(Web_Tar__Evaluate.Eval[/* eval */9], match[0], ctx, x[1]);
+                var match$2 = Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], match[0], ctx, x[1]);
                 var match$3 = match$2[0];
                 if (match$3.tag) {
                   return /* tuple */[
@@ -436,7 +436,7 @@ function add_builtins(state) {
                             ];
                   }
                   if (exit$1 === 2) {
-                    return Curry._5(Web_Tar__Evaluate.Eval[/* eval_lambda */10], func, /* :: */[
+                    return Curry._5(Web_Tar__Evaluate.Eval[/* eval_lambda */12], func, /* :: */[
                                 match$1[0],
                                 /* [] */0
                               ], "[Catch]", ctx, match$2[1]);
@@ -500,8 +500,8 @@ function add_builtins(state) {
                           state
                         ];
                 }
-                else if (Curry._2(Web_Tar__Evaluate.Eval[/* is_reserved_symbol */7], state, ident)) {
-                  var e = Curry._3(Web_Tar__Evaluate.Eval[/* eval */9], match$2[0], ctx, state);
+                else if (Curry._2(Web_Tar__Evaluate.Eval[/* is_reserved_symbol */9], state, ident)) {
+                  var e = Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], match$2[0], ctx, state);
                   var match$3 = e[0];
                   if (match$3.tag) {
                     return e;
@@ -517,7 +517,7 @@ function add_builtins(state) {
                     else {
                       return /* tuple */[
                               /* Ok */Block.__(0, [Web_Tar__Evaluate.Eval[/* empty_node */1]]),
-                              Curry._3(Web_Tar__Evaluate.Eval[/* define_user_symbol */5], e[1], ident, res)
+                              Curry._3(Web_Tar__Evaluate.Eval[/* define_user_symbol */7], e[1], ident, res)
                             ];
                     }
                   }
@@ -575,14 +575,251 @@ function add_builtins(state) {
         }
         
       }, state$9);
-  return add_native_lambda("unquote", /* true */1, function (args, ctx, state) {
-              var exit = 0;
-              if (args) {
-                if (args[1]) {
-                  exit = 1;
+  var state$11 = add_native_lambda("unquote", /* true */1, function (args, ctx, state) {
+        var exit = 0;
+        if (args) {
+          if (args[1]) {
+            exit = 1;
+          }
+          else {
+            return Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], args[0], ctx, state);
+          }
+        }
+        else {
+          exit = 1;
+        }
+        if (exit === 1) {
+          var received = Pervasives.string_of_int(List.length(args));
+          return /* tuple */[
+                  Web_Tar__Common.create_exception("Received " + (received + " arguments, expected 1 in call to 'unquote'")),
+                  state
+                ];
+        }
+        
+      }, state$10);
+  var traverse = function (node, ctx, state) {
+    var match = node[/* value */1];
+    if (match.tag === 5) {
+      var lst = match[0];
+      var exit = 0;
+      if (lst) {
+        var match$1 = lst[0][/* value */1];
+        if (match$1.tag) {
+          exit = 1;
+        }
+        else if (match$1[0] === "unquote") {
+          var lst$1 = lst[1];
+          var exit$1 = 0;
+          if (lst$1) {
+            if (lst$1[1]) {
+              exit$1 = 2;
+            }
+            else {
+              return Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], lst$1[0], ctx, state);
+            }
+          }
+          else {
+            exit$1 = 2;
+          }
+          if (exit$1 === 2) {
+            var received = Pervasives.string_of_int(List.length(lst$1));
+            return /* tuple */[
+                    Web_Tar__Common.create_exception("Received " + (received + " arguments, expected 1 in call to 'unquote'")),
+                    state
+                  ];
+          }
+          
+        }
+        else {
+          exit = 1;
+        }
+      }
+      else {
+        exit = 1;
+      }
+      if (exit === 1) {
+        var res = List.fold_right(function (param) {
+              return function (param$1) {
+                var v = param;
+                var acc = param$1;
+                var ctx$1 = ctx;
+                var match = acc[0];
+                if (match.tag) {
+                  return acc;
                 }
                 else {
-                  return Curry._3(Web_Tar__Evaluate.Eval[/* eval */9], args[0], ctx, state);
+                  var state = acc[1];
+                  var acc_lst = match[0];
+                  var match$1 = v[/* value */1];
+                  var exit = 0;
+                  if (match$1.tag === 5) {
+                    var match$2 = match$1[0];
+                    if (match$2) {
+                      var match$3 = match$2[0][/* value */1];
+                      if (match$3.tag) {
+                        exit = 1;
+                      }
+                      else if (match$3[0] === "unquote-splice") {
+                        var match$4 = match$2[1];
+                        if (match$4) {
+                          if (match$4[1]) {
+                            exit = 1;
+                          }
+                          else {
+                            var evaled = Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], match$4[0], ctx$1, state);
+                            var state$1 = evaled[1];
+                            var res = evaled[0];
+                            if (res.tag) {
+                              return /* tuple */[
+                                      /* Error */Block.__(1, [res[0]]),
+                                      state$1
+                                    ];
+                            }
+                            else {
+                              var match$5 = res[0][/* value */1];
+                              if (match$5.tag === 5) {
+                                return /* tuple */[
+                                        /* Ok */Block.__(0, [Pervasives.$at(acc_lst, match$5[0])]),
+                                        state$1
+                                      ];
+                              }
+                              else {
+                                return /* tuple */[
+                                        Web_Tar__Common.create_exception("'unquote-splice' only applies to lists"),
+                                        state$1
+                                      ];
+                              }
+                            }
+                          }
+                        }
+                        else {
+                          exit = 1;
+                        }
+                      }
+                      else {
+                        exit = 1;
+                      }
+                    }
+                    else {
+                      exit = 1;
+                    }
+                  }
+                  else {
+                    exit = 1;
+                  }
+                  if (exit === 1) {
+                    var match$6 = traverse(v, ctx$1, state);
+                    var state$2 = match$6[1];
+                    var res$1 = match$6[0];
+                    if (res$1.tag) {
+                      return /* tuple */[
+                              res$1,
+                              state$2
+                            ];
+                    }
+                    else {
+                      return /* tuple */[
+                              /* Ok */Block.__(0, [Pervasives.$at(acc_lst, /* :: */[
+                                        res$1[0],
+                                        /* [] */0
+                                      ])]),
+                              state$2
+                            ];
+                    }
+                  }
+                  
+                }
+              };
+            }, lst, /* tuple */[
+              /* Ok */Block.__(0, [/* [] */0]),
+              state
+            ]);
+        var match$2 = res[0];
+        if (match$2.tag) {
+          return /* tuple */[
+                  /* Error */Block.__(1, [match$2[0]]),
+                  res[1]
+                ];
+        }
+        else {
+          return /* tuple */[
+                  /* Ok */Block.__(0, [Web_Tar__Common.create_node(/* List */Block.__(5, [match$2[0]]))]),
+                  res[1]
+                ];
+        }
+      }
+      
+    }
+    else {
+      return /* tuple */[
+              /* Ok */Block.__(0, [node]),
+              state
+            ];
+    }
+  };
+  var state$12 = add_native_lambda("syntax-quote", /* true */1, function (args, ctx, state) {
+        var exit = 0;
+        if (args) {
+          if (args[1]) {
+            exit = 1;
+          }
+          else {
+            return traverse(args[0], ctx, state);
+          }
+        }
+        else {
+          exit = 1;
+        }
+        if (exit === 1) {
+          var received = Pervasives.string_of_int(List.length(args));
+          return /* tuple */[
+                  Web_Tar__Common.create_exception("Received " + (received + " arguments, expected 1 in call to 'syntax-quote'")),
+                  state
+                ];
+        }
+        
+      }, state$11);
+  return add_native_lambda("if", /* true */1, function (args, ctx, state) {
+              var exit = 0;
+              if (args) {
+                var match = args[1];
+                if (match) {
+                  var match$1 = match[1];
+                  if (match$1) {
+                    if (match$1[1]) {
+                      exit = 1;
+                    }
+                    else {
+                      var evaled_cond = Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], args[0], ctx, state);
+                      var match$2 = evaled_cond[0];
+                      if (match$2.tag) {
+                        return evaled_cond;
+                      }
+                      else {
+                        var match$3 = match$2[0][/* value */1];
+                        if (match$3.tag === 3) {
+                          if (match$3[0] !== 0) {
+                            return Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], match[0], ctx, evaled_cond[1]);
+                          }
+                          else {
+                            return Curry._3(Web_Tar__Evaluate.Eval[/* eval */11], match$1[0], ctx, evaled_cond[1]);
+                          }
+                        }
+                        else {
+                          return /* tuple */[
+                                  Web_Tar__Common.create_exception("First argument to 'if' must evaluate to boolean."),
+                                  evaled_cond[1]
+                                ];
+                        }
+                      }
+                    }
+                  }
+                  else {
+                    exit = 1;
+                  }
+                }
+                else {
+                  exit = 1;
                 }
               }
               else {
@@ -591,12 +828,12 @@ function add_builtins(state) {
               if (exit === 1) {
                 var received = Pervasives.string_of_int(List.length(args));
                 return /* tuple */[
-                        Web_Tar__Common.create_exception("Received " + (received + " arguments, expected 1 in call to 'unquote'")),
+                        Web_Tar__Common.create_exception("Received " + (received + " arguments, expected 1 in call to 'if'")),
                         state
                       ];
               }
               
-            }, state$10);
+            }, state$12);
 }
 
 exports.add_builtins = add_builtins;
@@ -737,14 +974,22 @@ var Curry                   = require("bs-platform/lib/js/curry");
 var Web_Tar__Common         = require("./web_Tar__Common");
 var List                    = require("bs-platform/lib/js/list");
 
-/* record */[
-  /* uuid */Web_Tar__Common.gen_uuid(/* () */0),
-  /* value : Bool */Block.__(3, [/* true */1])
+var trueNode_000 = /* uuid */Web_Tar__Common.gen_uuid(/* () */0);
+
+var trueNode_001 = /* value : Bool */Block.__(3, [/* true */1]);
+
+var trueNode = /* record */[
+  trueNode_000,
+  trueNode_001
 ];
 
-/* record */[
-  /* uuid */Web_Tar__Common.gen_uuid(/* () */0),
-  /* value : Bool */Block.__(3, [/* false */0])
+var falseNode_000 = /* uuid */Web_Tar__Common.gen_uuid(/* () */0);
+
+var falseNode_001 = /* value : Bool */Block.__(3, [/* false */0]);
+
+var falseNode = /* record */[
+  falseNode_000,
+  falseNode_001
 ];
 
 var empty_node_000 = /* uuid */Web_Tar__Common.gen_uuid(/* () */0);
@@ -1051,7 +1296,7 @@ function eval_lambda(called_func, args, _, ctx, state) {
               Caml_builtin_exceptions.assert_failure,
               [
                 "src/evaluate.re",
-                204,
+                206,
                 13
               ]
             ];
@@ -1098,6 +1343,8 @@ function eval_args(func, args, ctx, state) {
 var Eval = /* module */[
   /* empty */empty,
   /* empty_node */empty_node,
+  /* trueNode */trueNode,
+  /* falseNode */falseNode,
   /* is_macro */is_macro,
   /* create_initial_context */create_initial_context,
   /* define_native_symbol */define_native_symbol,
@@ -1110,7 +1357,7 @@ var Eval = /* module */[
 ];
 
 exports.Eval = Eval;
-/*  Not a pure module */
+/* trueNode Not a pure module */
 
 },{"./web_Tar__Common":3,"bs-platform/lib/js/block":7,"bs-platform/lib/js/caml_builtin_exceptions":11,"bs-platform/lib/js/curry":28,"bs-platform/lib/js/list":32,"bs-platform/lib/js/pervasives":35}],5:[function(require,module,exports){
 // Generated by BUCKLESCRIPT VERSION 1.3.2 , PLEASE EDIT WITH CARE
@@ -1123,6 +1370,7 @@ var Web_Tar__Common         = require("./web_Tar__Common");
 var $$String                = require("bs-platform/lib/js/string");
 var Caml_string             = require("bs-platform/lib/js/caml_string");
 var List                    = require("bs-platform/lib/js/list");
+var Web_Tar__Evaluate       = require("./web_Tar__Evaluate");
 
 function peek(stream) {
   if (stream) {
@@ -1461,10 +1709,23 @@ function parse(s) {
                 exit$4 = 1;
               }
               if (exit$4 === 1) {
-                return /* ParseOk */Block.__(0, [/* tuple */[
-                            stream$4,
-                            Web_Tar__Common.create_node(/* Ident */Block.__(0, [acc$3]))
-                          ]]);
+                switch (acc$3) {
+                  case "false" : 
+                      return /* ParseOk */Block.__(0, [/* tuple */[
+                                  stream$4,
+                                  Web_Tar__Evaluate.Eval[/* falseNode */3]
+                                ]]);
+                  case "true" : 
+                      return /* ParseOk */Block.__(0, [/* tuple */[
+                                  stream$4,
+                                  Web_Tar__Evaluate.Eval[/* trueNode */2]
+                                ]]);
+                  default:
+                    return /* ParseOk */Block.__(0, [/* tuple */[
+                                stream$4,
+                                Web_Tar__Common.create_node(/* Ident */Block.__(0, [acc$3]))
+                              ]]);
+                }
               }
               
             };
@@ -1494,7 +1755,7 @@ exports.Stream = Stream;
 exports.parse  = parse;
 /* Web_Tar__Common Not a pure module */
 
-},{"./web_Tar__Common":3,"bs-platform/lib/js/block":7,"bs-platform/lib/js/caml_builtin_exceptions":11,"bs-platform/lib/js/caml_format":15,"bs-platform/lib/js/caml_string":22,"bs-platform/lib/js/list":32,"bs-platform/lib/js/string":38}],6:[function(require,module,exports){
+},{"./web_Tar__Common":3,"./web_Tar__Evaluate":4,"bs-platform/lib/js/block":7,"bs-platform/lib/js/caml_builtin_exceptions":11,"bs-platform/lib/js/caml_format":15,"bs-platform/lib/js/caml_string":22,"bs-platform/lib/js/list":32,"bs-platform/lib/js/string":38}],6:[function(require,module,exports){
 'use strict';
 
 var Caml_builtin_exceptions = require("bs-platform/lib/js/caml_builtin_exceptions");
