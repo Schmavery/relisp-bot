@@ -254,5 +254,89 @@ let add_builtins state => {
             )
           }
       );
+  let rec traverseH (v: astNodeT) acc ctx::ctx :(result (list astNodeT) astNodeT, Eval.t) =>
+    switch acc {
+    | (Error _, _) => acc
+    | (Ok acc_lst, state) =>
+      switch v {
+      | {value: List [{value: Ident "unquote-splice"}, unquote_arg]} =>
+        let (res, state) as evaled = Eval.eval unquote_arg ctx::ctx state::state;
+        switch res {
+        | Error e => (Error e, state)
+        | Ok {value: List lst} => (Ok (acc_lst @ lst), state)
+        | Ok _ => (create_exception "'unquote-splice' only applies to lists", state)
+        }
+      | a =>
+        let (res, state) = traverse a ctx::ctx state::state;
+        switch res {
+        | Error _ as e => (e, state)
+        | Ok node => (Ok (acc_lst @ [node]), state)
+        }
+      }
+    }
+  and traverse (node: astNodeT) ctx::ctx state::state :(result astNodeT astNodeT, Eval.t) =>
+    switch node {
+    | {value: List [{value: Ident "unquote"}, next]} => Eval.eval next ctx::ctx state::state
+    | {value: List [{value: Ident "unquote"}, ...lst]} =>
+      let received = string_of_int (List.length lst);
+      (
+        create_exception ("Received " ^ received ^ " arguments, expected 1 in call to 'unquote'"),
+        state
+      )
+    | {value: List lst} =>
+      let res = List.fold_right (traverseH ctx::ctx) lst (Ok [], state);
+      switch res {
+      | (Ok a, state) => (Ok (create_node (List a)), state)
+      | (Error a, state) => (Error a, state)
+      }
+    | a => (Ok a, state)
+    };
+  let state =
+    add_native_lambda
+      state::state
+      "syntax-quote"
+      macro::true
+      (
+        fun args ctx::ctx state::state =>
+          switch args {
+          | [e] => traverse e ctx::ctx state::state
+          | lst =>
+            let received = List.length lst |> string_of_int;
+            (
+              create_exception (
+                "Received " ^ received ^ " arguments, expected 1 in call to 'syntax-quote'"
+              ),
+              state
+            )
+          }
+      );
+  let state =
+    add_native_lambda
+      state::state
+      "if"
+      macro::true
+      (
+        fun args ctx::ctx state::state =>
+          switch args {
+          | [cond, consequent, alternate] =>
+            let evaled_cond = Eval.eval cond state::state ctx::ctx;
+            switch (evaled_cond, consequent, alternate) {
+            | ((Error _, _) as e, _, _) => e
+            | ((Ok {value: Bool true}, state), eval_me, _)
+            | ((Ok {value: Bool false}, state), _, eval_me) =>
+              Eval.eval eval_me state::state ctx::ctx
+            | ((Ok _, state), _, _) => (
+                create_exception "First argument to 'if' must evaluate to boolean.",
+                state
+              )
+            }
+          | lst =>
+            let received = List.length lst |> string_of_int;
+            (
+              create_exception ("Received " ^ received ^ " arguments, expected 1 in call to 'if'"),
+              state
+            )
+          }
+      );
   state
 };

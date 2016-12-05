@@ -4,6 +4,8 @@ module type EvalT = {
   type t = evaluationStateT;
   let empty: t;
   let empty_node: astNodeT;
+  let trueNode: astNodeT;
+  let falseNode: astNodeT;
   let is_macro: astNodeT => bool;
   let create_initial_context: t => ctxT;
   let define_native_symbol: t => string => astNodeT => t;
@@ -21,7 +23,7 @@ module type EvalT = {
     (result astNodeT astNodeT, t);
 };
 
-let module Eval: EvalT = {
+module Eval: EvalT = {
   type t = evaluationStateT;
   let trueNode = {uuid: gen_uuid (), value: Bool true};
   let falseNode = {uuid: gen_uuid (), value: Bool false};
@@ -184,7 +186,7 @@ let module Eval: EvalT = {
         | (Ok args, state) => native.func args ctx::{...ctx, depth: ctx.depth + 1} state::state
         | (Error _, _) as e => e
         }
-      | Func ({func, args, scope, is_macro, vararg}) =>
+      | Func {func, args, scope, is_macro, vararg} =>
         switch maybe_args {
         | (Ok passed_args, state) =>
           let arg_to_node_map = create_lambda_arg_map vararg args passed_args StringMap.empty;

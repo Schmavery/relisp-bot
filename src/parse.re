@@ -1,4 +1,5 @@
 open Common;
+open Evaluate;
 
 let module Stream = {
   type t = list char;
@@ -58,7 +59,12 @@ let parse s => {
     | Some '('
     | Some ')'
     | Some '"'
-    | None => ParseOk (stream, create_node (Ident acc))
+    | None =>
+    switch acc {
+      | "true" => ParseOk (stream, Eval.trueNode)
+      | "false" => ParseOk (stream, Eval.falseNode)
+      | _ => ParseOk (stream, create_node (Ident acc))
+    }
     | Some c => parse_ident (Stream.pop stream) (acc ^ String.make 1 c)
     };
   let rec parse_num (stream: Stream.t) (acc: string) :parseResult =>
