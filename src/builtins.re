@@ -4,6 +4,15 @@ open Parse;
 
 open Evaluate;
 
+let received_error expected::expected args::args name::name state::state => (
+  create_exception (
+    "Received " ^
+    string_of_int (List.length args) ^
+    " arguments, expected " ^ string_of_int expected ^ " in call to '" ^ name ^ "'"
+  ),
+  state
+);
+
 let add_builtins state => {
   let add_native_lambda
       (name: string)
@@ -118,12 +127,7 @@ let add_builtins state => {
         }
       }
     | [_, _] => (create_exception "Expected list as first argument in call to 'lambda'", state)
-    | _ =>
-      let received = string_of_int (List.length args);
-      (
-        create_exception ("Received " ^ received ^ " arguments, expected 2 in call to 'lambda'"),
-        state
-      )
+    | args => received_error expected::2 args::args name::"lambda" state::state
     }
   };
   let state = add_native_lambda state::state "lambda" macro::true (create_lambda_func false);
@@ -134,15 +138,11 @@ let add_builtins state => {
       "throw"
       macro::false
       (
-        fun args ctx::ctx state::state => (
+        fun args ctx::ctx state::state =>
           switch args {
-          | [a] => Error a
-          | lst =>
-            let received = string_of_int (List.length lst);
-            create_exception ("Received " ^ received ^ " arguments, expected 2 in call to 'throw'")
-          },
-          state
-        )
+          | [a] => (Error a, state)
+          | lst => received_error expected::2 args::lst name::"throw" state::state
+          }
       );
   let state =
     add_native_lambda
@@ -158,22 +158,15 @@ let add_builtins state => {
               switch (Eval.eval lambda ctx::ctx state::state) {
               | (Ok ({value: NativeFunc _} as func), state)
               | (Ok ({value: Func _} as func), state) =>
-                Eval.eval_lambda func args::[ex] ctx::ctx func_name::"[Catch]" state::state
+                Eval.eval_lambda func args::[ex] ctx::ctx func_name::"[Try]" state::state
               | (_, state) => (
-                  create_exception "Expected lambda as second argument in call to 'catch'",
+                  create_exception "Expected lambda as second argument in call to 'try'",
                   state
                 )
               }
             | x => x
             }
-          | lst =>
-            let received = string_of_int (List.length lst);
-            (
-              create_exception (
-                "Received " ^ received ^ " arguments, expected 2 in call to 'catch'"
-              ),
-              state
-            )
+          | lst => received_error expected::2 args::lst name::"try" state::state
           }
       );
   let state =
@@ -184,7 +177,6 @@ let add_builtins state => {
       (
         fun args ctx::ctx state::state =>
           switch args {
-          | [] => (create_exception "Received no arguments, expected 2 in call to 'define'", state)
           | [{value: Ident ident}, other] =>
             if (ctx.depth > 2) {
               (create_exception "Can only define at the top level", state)
@@ -206,14 +198,7 @@ let add_builtins state => {
               create_exception "Expected ident as first argument in call to 'define'",
               state
             )
-          | lst =>
-            let received = string_of_int (List.length lst);
-            (
-              create_exception (
-                "Received " ^ received ^ " arguments, expected 2 in call to 'catch'"
-              ),
-              state
-            )
+          | lst => received_error expected::2 args::lst name::"define" state::state
           }
       );
   let state =
@@ -225,14 +210,7 @@ let add_builtins state => {
         fun args ctx::ctx state::state =>
           switch args {
           | [el] => (Ok el, state)
-          | lst =>
-            let received = string_of_int (List.length lst);
-            (
-              create_exception (
-                "Received " ^ received ^ " arguments, expected 1 in call to 'quote'"
-              ),
-              state
-            )
+          | lst => received_error expected::1 args::lst name::"quote" state::state
           }
       );
   let state =
@@ -244,14 +222,7 @@ let add_builtins state => {
         fun args ctx::ctx state::state =>
           switch args {
           | [el] => Eval.eval el ctx::ctx state::state
-          | lst =>
-            let received = string_of_int (List.length lst);
-            (
-              create_exception (
-                "Received " ^ received ^ " arguments, expected 1 in call to 'unquote'"
-              ),
-              state
-            )
+          | lst => received_error expected::1 args::lst name::"unquote" state::state
           }
       );
   let rec traverseH (v: astNodeT) acc ctx::ctx :(result (list astNodeT) astNodeT, Eval.t) =>
@@ -278,11 +249,7 @@ let add_builtins state => {
     switch node {
     | {value: List [{value: Ident "unquote"}, next]} => Eval.eval next ctx::ctx state::state
     | {value: List [{value: Ident "unquote"}, ...lst]} =>
-      let received = string_of_int (List.length lst);
-      (
-        create_exception ("Received " ^ received ^ " arguments, expected 1 in call to 'unquote'"),
-        state
-      )
+      received_error expected::1 args::lst name::"unquote" state::state
     | {value: List lst} =>
       let res = List.fold_right (traverseH ctx::ctx) lst (Ok [], state);
       switch res {
@@ -300,14 +267,7 @@ let add_builtins state => {
         fun args ctx::ctx state::state =>
           switch args {
           | [e] => traverse e ctx::ctx state::state
-          | lst =>
-            let received = List.length lst |> string_of_int;
-            (
-              create_exception (
-                "Received " ^ received ^ " arguments, expected 1 in call to 'syntax-quote'"
-              ),
-              state
-            )
+          | lst => received_error expected::1 args::lst name::"syntax-quote" state::state
           }
       );
   let state =
@@ -330,12 +290,7 @@ let add_builtins state => {
                 state
               )
             }
-          | lst =>
-            let received = List.length lst |> string_of_int;
-            (
-              create_exception ("Received " ^ received ^ " arguments, expected 1 in call to 'if'"),
-              state
-            )
+          | lst => received_error expected::3 args::lst name::"if" state::state
           }
       );
   state
