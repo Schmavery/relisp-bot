@@ -329,7 +329,7 @@ let add_builtins state => {
         fun args ctx::ctx state::state =>
           switch args {
           | [{value: Str lib_name}] =>
-            switch (read_lines ("lib/" ^ lib_name) |> Parse.parse_multi) {
+            switch (read_lines ("lib/" ^ lib_name ^ ".lib") |> Parse.parse_multi) {
             | Ok lst =>
               switch (eval_list lst state ctx) {
               | Ok state => (Ok Eval.empty_node, state)
