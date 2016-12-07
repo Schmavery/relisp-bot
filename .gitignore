@@ -1,5 +1,6 @@
 _build
 assets/lisp.js
+assets/lib/
 *~
 *.cmi
 *.exe
