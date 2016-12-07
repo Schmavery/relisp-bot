@@ -1,7 +1,5 @@
 open Common;
 
-open Parse;
-
 open Evaluate;
 
 external log : 'a => unit = "console.log" [@@bs.val];
@@ -31,7 +29,7 @@ let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 Random.self_init ();
 
 let process_input (in_str: string) (state: Eval.t) :(string, Eval.t) =>
-  switch (parse in_str) {
+  switch (Parse.parse_single in_str) {
   | Ok e =>
     let (res, state) = Eval.eval e ctx::(Eval.create_initial_context state) state::state;
     (string_of_ast res, state)
