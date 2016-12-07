@@ -225,7 +225,7 @@ let add_builtins state => {
           | lst => received_error expected::1 args::lst name::"unquote" state::state
           }
       );
-  let rec traverseH (v: astNodeT) acc ctx::ctx :(result (list astNodeT) astNodeT, Eval.t) =>
+  let rec traverseH acc (v: astNodeT) ctx::ctx :(result (list astNodeT) astNodeT, Eval.t) =>
     switch acc {
     | (Error _, _) => acc
     | (Ok acc_lst, state) =>
@@ -251,7 +251,7 @@ let add_builtins state => {
     | {value: List [{value: Ident "unquote"}, ...lst]} =>
       received_error expected::1 args::lst name::"unquote" state::state
     | {value: List lst} =>
-      let res = List.fold_right (traverseH ctx::ctx) lst (Ok [], state);
+      let res = List.fold_left (traverseH ctx::ctx) (Ok [], state) lst;
       switch res {
       | (Ok a, state) => (Ok (create_node (List a)), state)
       | (Error a, state) => (Error a, state)
@@ -291,6 +291,53 @@ let add_builtins state => {
               )
             }
           | lst => received_error expected::3 args::lst name::"if" state::state
+          }
+      );
+
+  /** Note: load will later have to be brought out to have context of the
+      environment it's running in to know how to load libs. */
+  let read_lines name :string => {
+    let ic = open_in name;
+    let try_read () =>
+      try (Some (input_line ic)) {
+      | End_of_file => None
+      };
+    let rec loop acc =>
+      switch (try_read ()) {
+      | Some s => loop [s, ...acc]
+      | None =>
+        close_in ic;
+        List.rev acc
+      };
+    loop [] |> String.concat ""
+  };
+  let rec eval_list (lst: list astNodeT) (state: Eval.t) (ctx: ctxT) :result Eval.t astNodeT =>
+    switch lst {
+    | [] => Ok state
+    | [hd, ...tl] =>
+      switch (Eval.eval hd state::state ctx::ctx) {
+      | (Ok _, state) => eval_list tl state ctx
+      | (Error e, _) => Error e
+      }
+    };
+  let state =
+    add_native_lambda
+      state::state
+      "load"
+      macro::true
+      (
+        fun args ctx::ctx state::state =>
+          switch args {
+          | [{value: Str lib_name}] =>
+            switch (read_lines ("lib/" ^ lib_name) |> Parse.parse_multi) {
+            | Ok lst =>
+              switch (eval_list lst state ctx) {
+              | Ok state => (Ok Eval.empty_node, state)
+              | Error e => (Error e, state)
+              }
+            | Error e => (Error e, state)
+            }
+          | lst => received_error expected::1 args::lst name::"load" state::state
           }
       );
   state

@@ -1,11 +1,9 @@
 open Common;
 
-open Parse;
-
 open Evaluate;
 
 let process_input (in_str: string) (state: Eval.t) :(string, Eval.t) =>
-  switch (parse in_str) {
+  switch (Parse.parse_single in_str) {
   | Ok e =>
     let (res, state) = Eval.eval e ctx::(Eval.create_initial_context state) state::state;
     (string_of_ast res, state)
