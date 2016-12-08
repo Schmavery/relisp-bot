@@ -17,3 +17,5 @@ assets/lib/
 
 node_modules
 .jenga
+
+.DS_Store
