@@ -33,8 +33,6 @@ type parseResult =
 
 let append_char (s: string) (c: char) :string => s ^ String.make 1 c;
 
-let is_num c => Char.code c >= Char.code '0' && Char.code c <= Char.code '9';
-
 
 /** atom parsers **/
 let rec parse_string (stream: Stream.t) (acc: string) :parseResult =>
@@ -67,6 +65,7 @@ let rec parse_ident (stream: Stream.t) (acc: string) :parseResult =>
     switch acc {
     | "true" => ParseOk (stream, Eval.trueNode)
     | "false" => ParseOk (stream, Eval.falseNode)
+    | "" => failwith "Parsed empty identifier"
     | _ => ParseOk (stream, create_node (Ident acc))
     }
   | Some c => parse_ident (Stream.pop stream) (append_char acc c)
@@ -74,7 +73,7 @@ let rec parse_ident (stream: Stream.t) (acc: string) :parseResult =>
 
 let rec parse_num (stream: Stream.t) (acc: string) :parseResult =>
   switch (Stream.peek stream) {
-  | Some c when is_num c => parse_num (Stream.pop stream) (append_char acc c)
+  | Some ('1'..'9' as c) => parse_num (Stream.pop stream) (append_char acc c)
   | _ =>
     let num =
       try (Some (float_of_string acc)) {
@@ -97,7 +96,7 @@ let rec parse (stream: Stream.t) :parseResult =>
   | Some '\n' =>
     print_endline "popped space";
     parse (Stream.pop stream)
-  | Some c when is_num c => parse_num stream ""
+  | Some '1'..'9' => parse_num stream ""
   | Some c => parse_ident stream ""
   | None => UnexpectedEnd
   }
