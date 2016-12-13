@@ -4,7 +4,7 @@ type result 'a 'b =
 
 type uuidT = string;
 
-let module StringMap = Map.Make String;
+module StringMap = Map.Make String;
 
 type astNodeT = {uuid: uuidT, value: valueT}
 and funcT = {
@@ -18,7 +18,8 @@ and nativeFuncT =
   list astNodeT =>
   ctx::ctxT =>
   state::evaluationStateT =>
-  (result astNodeT astNodeT, evaluationStateT)
+  cb::((result astNodeT astNodeT, evaluationStateT) => unit) =>
+  unit
 and nativeFuncRecT = {func: nativeFuncT, is_macro: bool}
 and ctxT = {argsUuidMap: StringMap.t astNodeT, argsTable: StringMap.t string, depth: int}
 and valueT =

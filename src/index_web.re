@@ -28,12 +28,10 @@ let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 
 Random.self_init ();
 
-let process_input (in_str: string) (state: Eval.t) :(string, Eval.t) =>
+let process_input (in_str: string) (state: Eval.t) cb::cb :unit =>
   switch (Parse.parse_single in_str) {
-  | Ok e =>
-    let (res, state) = Eval.eval e ctx::(Eval.create_initial_context state) state::state;
-    (string_of_ast res, state)
-  | Error _ as e => (string_of_ast e, state)
+  | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) state::state cb::cb
+  | Error _ as e => cb (e, state)
   };
 
 let input_element = getElementById "input";
@@ -48,6 +46,8 @@ let add_console_element inner_text => {
 };
 
 let state = ref (Builtins.add_builtins Eval.empty);
+
+let evaluating = ref false;
 
 let history: ref (list string) = ref [];
 
@@ -68,15 +68,23 @@ setOnKeyDown
   (
     fun e =>
       switch (getKeyCode e) {
-      | 13 =>
+      | 13 when not !evaluating =>
         let in_str = getValue input_element;
+        evaluating := true;
         history := [in_str, ...!history];
         position := 0;
-        let (out_str, new_state) = process_input in_str !state;
-        state := new_state;
-        setValue input_element "";
-        add_console_element ("> " ^ in_str);
-        add_console_element out_str;
+        process_input
+          in_str
+          !state
+          cb::(
+            fun (res, new_state) => {
+              evaluating := false;
+              state := new_state;
+              setValue input_element "";
+              add_console_element ("> " ^ in_str);
+              string_of_ast res |> add_console_element
+            }
+          );
         Js.false_
       | 38 /* UpArrow */ =>
         switch (moveHistory 1) {

@@ -13,14 +13,16 @@ module type EvalT = {
   let resolve_ident: string => ctxT => t => option astNodeT;
   let is_reserved_symbol: t => string => bool;
   let add_to_uuid_map: t => astNodeT => t;
-  let eval: astNodeT => ctx::ctxT => state::t => (result astNodeT astNodeT, t);
+  let eval:
+    astNodeT => ctx::ctxT => state::t => cb::((result astNodeT astNodeT, t) => unit) => unit;
   let eval_lambda:
     astNodeT =>
     args::list astNodeT =>
     func_name::string =>
     ctx::ctxT =>
     state::t =>
-    (result astNodeT astNodeT, t);
+    cb::((result astNodeT astNodeT, t) => unit) =>
+    unit;
 };
 
 module Eval: EvalT = {
@@ -127,20 +129,16 @@ module Eval: EvalT = {
     };
 
   /** Mutually recursive main eval logic **/
-  let rec eval
-          ({value} as original_node: astNodeT)
-          ctx::(ctx: ctxT)
-          state::(state: t)
-          :(result astNodeT astNodeT, t) =>
+  let rec eval ({value} as original_node: astNodeT) ctx::(ctx: ctxT) state::(state: t) cb::cb :unit =>
     switch value {
     | Ident ident =>
       switch (resolve_ident ident ctx state) {
-      | Some resolved => (Ok resolved, state)
-      | None => (create_exception ("Undeclared identifier [" ^ ident ^ "]."), state)
+      | Some resolved => cb (Ok resolved, state)
+      | None => cb (create_exception ("Undeclared identifier [" ^ ident ^ "]."), state)
       }
     | List lst =>
       switch lst {
-      | [] => (Ok original_node, state)
+      | [] => cb (Ok original_node, state)
       | [first, ...args] =>
         let name =
           switch first {
@@ -148,87 +146,126 @@ module Eval: EvalT = {
           | {value: List _} => "[Lambda function]"
           | _ => "Unknown"
           };
-        let (evaled_first, state) = eval first ctx::ctx state::state;
-        switch evaled_first {
-        | Ok ({value: NativeFunc f} as func) when not f.is_macro =>
-          switch (eval_lambda func args::args ctx::ctx func_name::name state::state) {
-          | (Ok x, state) => eval x ctx::ctx state::state
-          | (Error _, _) as e => e
-          }
-        | Ok ({value: NativeFunc _} as func)
-        | Ok ({value: Func _} as func) =>
-          eval_lambda func args::args ctx::ctx func_name::name state::state
-        | Error e => (Error e, state)
-        | Ok x => (
-            create_exception (
-              "Trying to call something that isn't a function. [" ^ string_of_ast (Ok x) ^ "]"
-            ),
-            state
+        eval
+          first
+          ctx::ctx
+          state::state
+          cb::(
+            fun (evaled_first, state) =>
+              switch evaled_first {
+              | Ok ({value: NativeFunc f} as func) when not f.is_macro =>
+                eval_lambda
+                  func
+                  args::args
+                  ctx::ctx
+                  func_name::name
+                  state::state
+                  cb::(
+                    fun res =>
+                      switch res {
+                      | (Ok x, state) => eval x ctx::ctx state::state cb::cb
+                      | (Error _, _) as e => cb e
+                      }
+                  )
+              | Ok ({value: NativeFunc _} as func)
+              | Ok ({value: Func _} as func) =>
+                eval_lambda func args::args ctx::ctx func_name::name state::state cb::cb
+              | Error e => cb (Error e, state)
+              | Ok x =>
+                let node_str = string_of_ast (Ok x);
+                cb (
+                  create_exception (
+                    "Trying to call something that isn't a function. [" ^ node_str ^ "]"
+                  ),
+                  state
+                )
+              }
           )
-        }
       }
-    | _ => (Ok original_node, state)
+    | _ => cb (Ok original_node, state)
     }
+  /* and eval_lambda
+     ({uuid, value: func_value} as called_func: astNodeT)
+     args::(args: list astNodeT)
+     func_name::(func_name: string)
+     ctx::(ctx: ctxT)
+     state::state
+     cb::(cb: (result astNodeT astNodeT, t) => unit)
+     :unit => */
   and eval_lambda
       ({uuid, value: func_value} as called_func: astNodeT)
       args::(args: list astNodeT)
       func_name::(func_name: string)
       ctx::(ctx: ctxT)
       state::state
-      :(result astNodeT astNodeT, t) =>
+      cb::cb =>
     if (ctx.depth > max_stack) {
-      (create_exception ("Stack overflow > " ^ string_of_int max_stack), state)
+      cb (create_exception ("Stack overflow > " ^ string_of_int max_stack), state)
     } else {
-      let maybe_args = eval_args called_func args ctx state;
-      switch func_value {
-      | NativeFunc native =>
-        switch maybe_args {
-        | (Ok args, state) => native.func args ctx::{...ctx, depth: ctx.depth + 1} state::state
-        | (Error _, _) as e => e
-        }
-      | Func {func, args, scope, is_macro, vararg} =>
-        switch maybe_args {
-        | (Ok passed_args, state) =>
-          let arg_to_node_map = create_lambda_arg_map vararg args passed_args StringMap.empty;
-          switch arg_to_node_map {
-          | Error e => (create_exception e, state)
-          | Ok map =>
-            let argsUuidMap =
-              StringMap.fold
-                (fun key value acc => StringMap.add value.uuid value acc) map ctx.argsUuidMap;
-            let arg_map = StringMap.map (fun value => value.uuid) map;
-            let argsTable = stringmap_union arg_map scope;
-            let ctx = {depth: ctx.depth + 1, argsUuidMap, argsTable};
-            eval func ctx::ctx state::state
-          }
-        | (Error _, _) as e => e
-        }
-      | _ => assert false
-      }
+      eval_args
+        called_func
+        args
+        ctx
+        state
+        []
+        cb::(
+          fun maybe_args =>
+            switch func_value {
+            | NativeFunc native =>
+              switch maybe_args {
+              | (Ok args, state) =>
+                native.func args ctx::{...ctx, depth: ctx.depth + 1} state::state cb::cb
+              | (Error _, _) as e => cb e
+              }
+            | Func {func, args, scope, is_macro, vararg} =>
+              switch maybe_args {
+              | (Ok passed_args, state) =>
+                let arg_to_node_map =
+                  create_lambda_arg_map vararg args passed_args StringMap.empty;
+                switch arg_to_node_map {
+                | Error e => cb (create_exception e, state)
+                | Ok map =>
+                  let argsUuidMap =
+                    StringMap.fold
+                      (fun key value acc => StringMap.add value.uuid value acc)
+                      map
+                      ctx.argsUuidMap;
+                  let arg_map = StringMap.map (fun value => value.uuid) map;
+                  let argsTable = stringmap_union arg_map scope;
+                  let ctx = {depth: ctx.depth + 1, argsUuidMap, argsTable};
+                  eval func ctx::ctx state::state cb::cb
+                }
+              | (Error _, _) as e => cb e
+              }
+            | _ => assert false
+            }
+        )
     }
   and eval_args
       (func: astNodeT)
       (args: list astNodeT)
       (ctx: ctxT)
       (state: t)
-      :(result (list astNodeT) astNodeT, t) =>
+      (acc: list astNodeT)
+      cb::(return: (result (list astNodeT) astNodeT, t) => unit)
+      :unit =>
     if (is_macro func) {
-      (Ok args, state)
+      return (Ok args, state)
     } else {
-      /* Eval args, accounting for exceptions */
-      List.fold_right
-        (
-          fun e acc =>
-            switch acc {
-            | (Ok acc, state) =>
-              switch (eval ctx::ctx e state::state) {
-              | (Ok x, state) => (Ok [x, ...acc], state)
-              | (Error _, _) as e => e
+      switch args {
+      | [] => return (Ok (List.rev acc), state)
+      | [hd, ...tl] =>
+        eval
+          hd
+          ctx::ctx
+          state::state
+          cb::(
+            fun (res, state) =>
+              switch res {
+              | Ok v => eval_args func tl ctx state [v, ...acc] cb::return
+              | Error e => return (Error e, state)
               }
-            | x => x
-            }
-        )
-        args
-        (Ok [], state)
+          )
+      }
     };
 };
