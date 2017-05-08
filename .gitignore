@@ -1,4 +1,5 @@
 _build
+lib
 assets/lisp.js
 assets/lib/
 *~
@@ -14,6 +15,7 @@ assets/lib/
 *.annot
 *.run
 *.opt
+.merlin
 
 node_modules
 .jenga

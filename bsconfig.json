@@ -1,0 +1,7 @@
+
+{
+    "name" : "ReLispBot",
+    "sources": [
+      { "dir": "src" }
+    ]
+}
