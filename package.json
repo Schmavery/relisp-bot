@@ -17,7 +17,8 @@
     "build": "bsb",
     "build-deps": "bsb -make-world",
     "watch": "bsb -w",
-    "pack": "browserify lib/js/src/index_web.js > assets/lisp.js",
+    "pack": "browserify lib/js/examples/web/index.js > assets/lisp.js",
+    "cli": "node lib/js/examples/node/index.js",
     "deploy": "node scripts/deploy-ghpages.js"
   },
   "dependencies": {

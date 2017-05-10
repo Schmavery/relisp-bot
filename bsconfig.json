@@ -2,6 +2,9 @@
 {
     "name" : "ReLispBot",
     "sources": [
-      { "dir": "src" }
+      { "dir": "src" },
+      { "dir": "examples/web", "type": "dev"},
+      { "dir": "examples/node", "type": "dev"},
+      { "dir": "examples/bot", "type": "dev"}
     ]
 }
