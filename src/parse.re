@@ -45,7 +45,8 @@ let rec parse_string (stream: Stream.t) (acc: string) :parseResult =>
     | Some '"' => parse_string (Stream.pop pop_str) (append_char acc '"')
     | Some '\'' => parse_string (Stream.pop pop_str) (append_char acc '\'')
     | Some '\\' => parse_string (Stream.pop pop_str) (append_char acc '\\')
-    | Some c => ParseFail ("Invalid escape sequence \\" ^ append_char "" c ^ ".")
+    | Some c =>
+      ParseFail ("Invalid escape sequence \\" ^ append_char "" c ^ ".")
     | None => ParseFail "Unterminated string."
     }
   | Some '"' => ParseOk (Stream.pop stream, create_node (Str acc))
@@ -65,7 +66,7 @@ let rec parse_ident (stream: Stream.t) (acc: string) :parseResult =>
     switch acc {
     | "true" => ParseOk (stream, Eval.trueNode)
     | "false" => ParseOk (stream, Eval.falseNode)
-    | "" => failwith "Parsed empty identifier"
+    | "" => ParseFail "Parsed empty identifier"
     | _ => ParseOk (stream, create_node (Ident acc))
     }
   | Some c => parse_ident (Stream.pop stream) (append_char acc c)
@@ -93,9 +94,7 @@ let rec parse (stream: Stream.t) :parseResult =>
   | Some '(' => parse_list (Stream.pop stream) []
   | Some ' '
   | Some '\t'
-  | Some '\n' =>
-    print_endline "popped space";
-    parse (Stream.pop stream)
+  | Some '\n' => parse (Stream.pop stream)
   | Some '1'..'9' => parse_num stream ""
   | Some c => parse_ident stream ""
   | None => UnexpectedEnd
@@ -115,7 +114,10 @@ and parse_list (stream: Stream.t) (acc: list astNodeT) :parseResult =>
   | None => ParseFail "Unterminated list."
   };
 
-let rec parse_multi (stream: Stream.t) (acc: list astNodeT) :result (list astNodeT) astNodeT =>
+let rec parse_multi
+        (stream: Stream.t)
+        (acc: list astNodeT)
+        :result (list astNodeT) astNodeT =>
   switch (Stream.peek stream) {
   | Some _ =>
     switch (parse stream) {
@@ -126,7 +128,8 @@ let rec parse_multi (stream: Stream.t) (acc: list astNodeT) :result (list astNod
   | None => Ok (List.rev acc)
   };
 
-let parse_multi (s: string) :result (list astNodeT) astNodeT => parse_multi (Stream.create s) [];
+let parse_multi (s: string) :result (list astNodeT) astNodeT =>
+  parse_multi (Stream.create s) [];
 
 let parse_single s :result astNodeT astNodeT => {
   let stream = Stream.create s;
@@ -134,7 +137,8 @@ let parse_single s :result astNodeT astNodeT => {
   | ParseOk (s, node) =>
     switch (Stream.peek s) {
     | None => Ok node
-    | Some c => create_exception ("Unexpected character " ^ append_char "" c ^ ".")
+    | Some c =>
+      create_exception ("Unexpected character [" ^ append_char "" c ^ "].")
     }
   | ParseFail error => create_exception error
   | UnexpectedEnd => create_exception "Unexpected end of input."

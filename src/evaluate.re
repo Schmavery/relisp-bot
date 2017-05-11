@@ -6,6 +6,7 @@ module type EvalT = {
   let empty_node: astNodeT;
   let trueNode: astNodeT;
   let falseNode: astNodeT;
+  let to_bool_node: bool => astNodeT;
   let is_macro: astNodeT => bool;
   let create_initial_context: t => ctxT;
   let define_native_symbol: t => string => astNodeT => t;
@@ -31,15 +32,16 @@ module type EvalT = {
 
 module Eval: EvalT = {
   type t = evaluationStateT;
-  let trueNode = {uuid: gen_uuid (), value: Bool true};
-  let falseNode = {uuid: gen_uuid (), value: Bool false};
-  let empty_node = {uuid: gen_uuid (), value: List []};
-  let max_stack = 512;
   let empty: t = {
     userTable: StringMap.empty,
     uuidToNodeMap: StringMap.empty,
     symbolTable: StringMap.empty
   };
+  let empty_node = {uuid: gen_uuid (), value: List []};
+  let trueNode = {uuid: gen_uuid (), value: Bool true};
+  let falseNode = {uuid: gen_uuid (), value: Bool false};
+  let to_bool_node b => if b {trueNode} else {falseNode};
+  let max_stack = 512;
   let is_macro func :bool =>
     switch func {
     | {value: NativeFunc f} => f.is_macro
