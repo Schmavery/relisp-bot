@@ -550,7 +550,8 @@ module Builtins (Environment: EnvironmentT) => {
               print_endline (string_of_stringmap scope);
               (Ok Eval.empty_node, state)
             | lst =>
-              received_error expected::2 args::lst name::"equal?" ::state
+              received_error
+                expected::1 args::lst name::"DEBUG/print-scope" ::state
             }
         );
     let state =
@@ -565,7 +566,8 @@ module Builtins (Environment: EnvironmentT) => {
               print_endline (string_of_state state);
               (Ok Eval.empty_node, state)
             | lst =>
-              received_error expected::2 args::lst name::"equal?" ::state
+              received_error
+                expected::0 args::lst name::"DEBUG/print-state" ::state
             }
         );
     state

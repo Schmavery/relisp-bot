@@ -74,7 +74,7 @@ let rec parse_ident (stream: Stream.t) (acc: string) :parseResult =>
 
 let rec parse_num (stream: Stream.t) (acc: string) :parseResult =>
   switch (Stream.peek stream) {
-  | Some ('1'..'9' as c) => parse_num (Stream.pop stream) (append_char acc c)
+  | Some ('0'..'9' as c) => parse_num (Stream.pop stream) (append_char acc c)
   | _ =>
     let num =
       try (Some (float_of_string acc)) {
