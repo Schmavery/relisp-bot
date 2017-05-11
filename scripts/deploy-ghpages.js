@@ -18,5 +18,5 @@ function copyFolder(source, target) {
       .pipe(fs.createWriteStream(tgtFile));
   } );
 }
-copyFolder("stdlib", "assets/lib");
-ghpages.publish('./assets', err => {if (err) console.error(err) else console.log('Published successfully')});
+copyFolder("stdlib", "assets/stdlib");
+ghpages.publish('./assets', err => {if (err) console.error(err); else console.log('Published successfully');});
