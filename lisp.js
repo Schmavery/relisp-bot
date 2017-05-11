@@ -1021,13 +1021,13 @@ function Builtins(Environment) {
             exit = 1;
           }
           if (exit === 1) {
-            return received_error(2, args, "equal?", state);
+            return received_error(1, args, "DEBUG/print-scope", state);
           }
           
         }, state$15);
     return add_native_lambda("DEBUG/print-state", /* false */0, function (args, _, state) {
                 if (args) {
-                  return received_error(2, args, "equal?", state);
+                  return received_error(0, args, "DEBUG/print-state", state);
                 } else {
                   console.log(Common.string_of_state(state));
                   return /* tuple */[
@@ -1795,7 +1795,7 @@ function parse_num(_stream, _acc) {
     var exit = 0;
     if (match) {
       var c = match[0];
-      if (c > 57 || c < 49) {
+      if (c > 57 || c < 48) {
         exit = 1;
       } else {
         _acc = append_char(acc, c);

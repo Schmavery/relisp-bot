@@ -1,7 +1,0 @@
-(define test 1)
-
-(define nil (quote ()))
-
-(define nil? (lambda (x) (equal? nil x)))
-
-(define identity (lambda (x) x))
