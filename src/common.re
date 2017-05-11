@@ -21,7 +21,11 @@ and nativeFuncT =
   cb::((result astNodeT astNodeT, evaluationStateT) => unit) =>
   unit
 and nativeFuncRecT = {func: nativeFuncT, is_macro: bool}
-and ctxT = {argsUuidMap: StringMap.t astNodeT, argsTable: StringMap.t uuidT, depth: int}
+and ctxT = {
+  argsUuidMap: StringMap.t astNodeT,
+  argsTable: StringMap.t uuidT,
+  depth: int
+}
 and valueT =
   | Ident string
   | Str string
@@ -39,7 +43,8 @@ and evaluationStateT = {
 
 let gen_uuid () => {
   let s4 () => Printf.sprintf "%04x" (Random.int 65536);
-  s4 () ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
+  s4 () ^
+  s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
 };
 
 let stringmap_get key map =>
@@ -89,7 +94,9 @@ let rec string_of_ast (ast: result astNodeT astNodeT) :string => {
     | Num x => string_of_float x
     | Bool x => string_of_bool x
     | Ref _ => "[Ref]"
-    | List x => "(" ^ (List.map (fun v => string_of_ast (Ok v)) x |> String.concat " ") ^ ")"
+    | List x =>
+      "(" ^
+      (List.map (fun v => string_of_ast (Ok v)) x |> String.concat " ") ^ ")"
     | Func ({is_macro: false} as f) => string_of_func f
     | Func ({is_macro: true} as f) => string_of_func f
     | NativeFunc {is_macro: false} => "[Native Function]"
@@ -98,3 +105,12 @@ let rec string_of_ast (ast: result astNodeT astNodeT) :string => {
   | Error ex => "[Exception of " ^ string_of_ast (Ok ex) ^ "]"
   }
 };
+
+let string_of_stringmap table =>
+  StringMap.fold (fun k v a => a ^ k ^ ":\t" ^ v ^ "\n") table "";
+
+let string_of_state state =>
+  "====state====\nuserTable:\n" ^
+  string_of_stringmap state.userTable ^
+  "-------------\nsymbolTable:\n" ^
+  string_of_stringmap state.symbolTable ^ "\n=============";

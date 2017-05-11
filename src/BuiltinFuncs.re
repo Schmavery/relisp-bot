@@ -239,11 +239,11 @@ module Builtins (Environment: EnvironmentT) => {
             switch args {
             | [{value: Ident ident}, {value: Str _}, other]
             | [{value: Ident ident}, other] =>
-              let docs = switch args {
+              let docs =
+                switch args {
                 | [_, {value: Str docs}, _] => docs
                 | _ => "No docs."
-              };
-
+                };
               if (ctx.depth > 2) {
                 return (
                   create_exception "Can only define at the top level",
@@ -328,9 +328,6 @@ module Builtins (Environment: EnvironmentT) => {
       switch lst {
       | [] => return (Ok acc, state)
       | [v, ...tl] =>
-        /* switch acc {
-           | (Error _, _) => return acc
-           | (Ok acc_lst, state) => */
         switch v {
         | {value: List [{value: Ident "unquote-splice"}, unquote_arg]} =>
           Eval.eval
@@ -364,8 +361,6 @@ module Builtins (Environment: EnvironmentT) => {
                 }
             )
         }
-      /* } */
-      /* | [] => return (ok ) */
       }
     and traverse
         (node: astNodeT)
@@ -379,7 +374,6 @@ module Builtins (Environment: EnvironmentT) => {
       | {value: List [{value: Ident "unquote"}, ...lst]} =>
         return (received_error expected::1 args::lst name::"unquote" ::state)
       | {value: List lst} =>
-        /* let res = List.fold_left (traverseH ctx::ctx) (Ok [], state) lst; */
         traverseH
           lst
           []
@@ -439,24 +433,6 @@ module Builtins (Environment: EnvironmentT) => {
               return (received_error expected::3 args::lst name::"if" ::state)
             }
         );
-
-    /** Note: load will later have to be brought out to have context of the
-        environment it's running in to know how to load libs. */
-    let read_lib (name: string) ::cb => {
-      let ic = open_in ("lib/" ^ name ^ ".lib");
-      let try_read () =>
-        try (Some (input_line ic)) {
-        | End_of_file => None
-        };
-      let rec loop acc =>
-        switch (try_read ()) {
-        | Some s => loop [s, ...acc]
-        | None =>
-          close_in ic;
-          List.rev acc
-        };
-      loop [] |> String.concat "" |> cb
-    };
     let rec eval_list
             (lst: list astNodeT)
             (state: Eval.t)
@@ -471,10 +447,12 @@ module Builtins (Environment: EnvironmentT) => {
           ::ctx
           cb::(
             fun
-            | (Ok _, state) => eval_list tl state ctx cb::return
+            | (Ok _, state) =>
+              eval_list tl state (Eval.create_initial_context state) cb::return
             | (Error e, _) => return (Error e)
           )
       };
+    /* TODO: handle loading in a loop */
     let state =
       add_native_lambda_async
         ::state
@@ -519,6 +497,75 @@ module Builtins (Environment: EnvironmentT) => {
               return (
                 received_error expected::1 args::lst name::"load" ::state
               )
+            }
+        );
+    let rec equal_helper {value: v1, uuid: uuid1} {value: v2, uuid: uuid2} =>
+      uuid1 == uuid2 ||
+      v1 == v2 || (
+        switch (v1, v2) {
+        | (Ident s1, Ident s2)
+        | (Str s1, Str s2) => s1 == s2
+        | (Num n1, Num n2) => n1 == n2
+        | (Bool b1, Bool b2) => b1 == b2
+        | (Ref u1, Ref u2) => u1 == u2
+        | (List l1, List l2) =>
+          try (
+            List.fold_left2
+              (fun acc e1 e2 => acc || equal_helper e1 e2) true l1 l2
+          ) {
+          | Invalid_argument _ => false
+          }
+        | (
+            Func {func: f1, args: a1, vararg: v1, scope: s1, is_macro: m1},
+            Func {func: f2, args: a2, vararg: v2, scope: s2, is_macro: m2}
+          ) =>
+          m1 == m2 && a1 == a2 && v1 == v2 && s1 == s2 && equal_helper f1 f2
+        | (NativeFunc _, NativeFunc _) =>
+          /*This is only true if they have the same uuid, checked above*/ false
+        | _ => false
+        }
+      );
+    let state =
+      add_native_lambda
+        ::state
+        "equal?"
+        macro::false
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [e1, e2] => (Ok (Eval.to_bool_node (equal_helper e1 e2)), state)
+            | lst =>
+              received_error expected::2 args::lst name::"equal?" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "DEBUG/print-scope"
+        macro::false
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [{value: Func {scope}}] =>
+              print_endline (string_of_stringmap scope);
+              (Ok Eval.empty_node, state)
+            | lst =>
+              received_error expected::2 args::lst name::"equal?" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "DEBUG/print-state"
+        macro::false
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [] =>
+              print_endline (string_of_state state);
+              (Ok Eval.empty_node, state)
+            | lst =>
+              received_error expected::2 args::lst name::"equal?" ::state
             }
         );
     state
