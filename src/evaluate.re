@@ -14,7 +14,11 @@ module type EvalT = {
   let is_reserved_symbol: t => string => bool;
   let add_to_uuid_map: t => astNodeT => t;
   let eval:
-    astNodeT => ctx::ctxT => state::t => cb::((result astNodeT astNodeT, t) => unit) => unit;
+    astNodeT =>
+    ctx::ctxT =>
+    state::t =>
+    cb::((result astNodeT astNodeT, t) => unit) =>
+    unit;
   let eval_lambda:
     astNodeT =>
     args::list astNodeT =>
@@ -57,7 +61,8 @@ module Eval: EvalT = {
   };
 
   /***/
-  let is_reserved_symbol state ident_name => stringmap_get ident_name state.symbolTable == None;
+  let is_reserved_symbol state ident_name =>
+    stringmap_get ident_name state.symbolTable == None;
   let define_native_symbol (state: t) (ident_name: string) (node: astNodeT) :t => {
     ...state,
     symbolTable: StringMap.add ident_name node.uuid state.symbolTable,
@@ -72,7 +77,11 @@ module Eval: EvalT = {
   };
 
   /***/
-  let resolve_ident (ident_name: string) (ctx: ctxT) (state: t) :option astNodeT => {
+  let resolve_ident
+      (ident_name: string)
+      (ctx: ctxT)
+      (state: t)
+      :option astNodeT => {
     let uuid =
       switch (stringmap_get ident_name state.symbolTable) {
       | Some _ as uuid => uuid
@@ -86,7 +95,8 @@ module Eval: EvalT = {
       | None =>
         switch (stringmap_get x ctx.argsUuidMap) {
         | Some x => Some x
-        | None => failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
+        | None =>
+          failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
         }
       }
     }
@@ -110,7 +120,8 @@ module Eval: EvalT = {
       let received = expected + List.length rest;
       Error (
         "Expected " ^
-        string_of_int expected ^ " arguments, received " ^ string_of_int received ^ " arguments."
+        string_of_int expected ^
+        " arguments, received " ^ string_of_int received ^ " arguments."
       )
     | (rest, [], None)
     | (rest, [], Some _) =>
@@ -124,17 +135,24 @@ module Eval: EvalT = {
         ) + received;
       Error (
         "Expected " ^
-        string_of_int expected ^ " arguments, received " ^ string_of_int received ^ " arguments."
+        string_of_int expected ^
+        " arguments, received " ^ string_of_int received ^ " arguments."
       )
     };
 
   /** Mutually recursive main eval logic **/
-  let rec eval ({value} as original_node: astNodeT) ctx::(ctx: ctxT) state::(state: t) cb::cb :unit =>
+  let rec eval
+          ({value} as original_node: astNodeT)
+          ctx::(ctx: ctxT)
+          state::(state: t)
+          ::cb
+          :unit =>
     switch value {
     | Ident ident =>
       switch (resolve_ident ident ctx state) {
       | Some resolved => cb (Ok resolved, state)
-      | None => cb (create_exception ("Undeclared identifier [" ^ ident ^ "]."), state)
+      | None =>
+        cb (create_exception ("Undeclared identifier [" ^ ident ^ "]."), state)
       }
     | List lst =>
       switch lst {
@@ -148,34 +166,35 @@ module Eval: EvalT = {
           };
         eval
           first
-          ctx::ctx
-          state::state
+          ::ctx
+          ::state
           cb::(
             fun (evaled_first, state) =>
               switch evaled_first {
               | Ok ({value: NativeFunc f} as func) when not f.is_macro =>
                 eval_lambda
                   func
-                  args::args
-                  ctx::ctx
+                  ::args
+                  ::ctx
                   func_name::name
-                  state::state
+                  ::state
                   cb::(
                     fun res =>
                       switch res {
-                      | (Ok x, state) => eval x ctx::ctx state::state cb::cb
+                      | (Ok x, state) => eval x ::ctx ::state ::cb
                       | (Error _, _) as e => cb e
                       }
                   )
               | Ok ({value: NativeFunc _} as func)
               | Ok ({value: Func _} as func) =>
-                eval_lambda func args::args ctx::ctx func_name::name state::state cb::cb
+                eval_lambda func ::args ::ctx func_name::name ::state ::cb
               | Error e => cb (Error e, state)
               | Ok x =>
                 let node_str = string_of_ast (Ok x);
                 cb (
                   create_exception (
-                    "Trying to call something that isn't a function. [" ^ node_str ^ "]"
+                    "Trying to call something that isn't a function. [" ^
+                    node_str ^ "]"
                   ),
                   state
                 )
@@ -197,10 +216,13 @@ module Eval: EvalT = {
       args::(args: list astNodeT)
       func_name::(func_name: string)
       ctx::(ctx: ctxT)
-      state::state
-      cb::cb =>
+      ::state
+      ::cb =>
     if (ctx.depth > max_stack) {
-      cb (create_exception ("Stack overflow > " ^ string_of_int max_stack), state)
+      cb (
+        create_exception ("Stack overflow > " ^ string_of_int max_stack),
+        state
+      )
     } else {
       eval_args
         called_func
@@ -214,14 +236,16 @@ module Eval: EvalT = {
             | NativeFunc native =>
               switch maybe_args {
               | (Ok args, state) =>
-                native.func args ctx::{...ctx, depth: ctx.depth + 1} state::state cb::cb
+                native.func
+                  args ctx::{...ctx, depth: ctx.depth + 1} ::state ::cb
               | (Error _, _) as e => cb e
               }
             | Func {func, args, scope, is_macro, vararg} =>
               switch maybe_args {
               | (Ok passed_args, state) =>
                 let arg_to_node_map =
-                  create_lambda_arg_map vararg args passed_args StringMap.empty;
+                  create_lambda_arg_map
+                    vararg args passed_args StringMap.empty;
                 switch arg_to_node_map {
                 | Error e => cb (create_exception e, state)
                 | Ok map =>
@@ -233,7 +257,7 @@ module Eval: EvalT = {
                   let arg_map = StringMap.map (fun value => value.uuid) map;
                   let argsTable = stringmap_union arg_map scope;
                   let ctx = {depth: ctx.depth + 1, argsUuidMap, argsTable};
-                  eval func ctx::ctx state::state cb::cb
+                  eval func ::ctx ::state ::cb
                 }
               | (Error _, _) as e => cb e
               }
@@ -257,8 +281,8 @@ module Eval: EvalT = {
       | [hd, ...tl] =>
         eval
           hd
-          ctx::ctx
-          state::state
+          ::ctx
+          ::state
           cb::(
             fun (res, state) =>
               switch res {

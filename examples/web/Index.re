@@ -2,11 +2,55 @@ open Common;
 
 open Evaluate;
 
+module Environment: BuiltinFuncs.EnvironmentT = {
+  /* var xhr = new XMLHttpRequest(); */
+  /*     xhr.open('GET', path, false); */
+  /*     xhr.send(null); */
+  /*     var contents = null */
+  /*     if (xhr.readyState === 4 && xhr.status === 200) { */
+  /*       contents = xhr.responseText */
+  /*     } */
+  module XHR = {
+    type t;
+    external create : unit => t = "XMLHttpRequest" [@@bs.new];
+    external open_ :
+      t => string => string => _ [@bs.as {json|true|json}] => unit =
+      "open" [@@bs.send];
+    external send : t => unit = "send" [@@bs.send];
+    external readyState : t => int = "readyState" [@@bs.get];
+    external status : t => int = "status" [@@bs.get];
+    external responseText : t => string = "responseText" [@@bs.get];
+    external setOnReadyStateChange : t => (unit => unit) => unit =
+      "onreadystatechange" [@@bs.set];
+  };
+  let load_lib filename ::cb => {
+    let xhr = XHR.create ();
+    XHR.setOnReadyStateChange
+      xhr
+      (
+        fun () =>
+          if (XHR.readyState xhr == 4 && XHR.status xhr == 200) {
+            cb (Some (XHR.responseText xhr))
+          } else if (
+            XHR.readyState xhr == 4
+          ) {
+            cb None
+          }
+      );
+    XHR.open_ xhr "GET" ("stdlib/" ^ filename ^ ".lib");
+    XHR.send xhr
+  };
+};
+
+module Builtins = BuiltinFuncs.Builtins Environment;
+
 external log : 'a => unit = "console.log" [@@bs.val];
 
-external getElementById : string => Js.t 'a = "document.getElementById" [@@bs.val];
+external getElementById : string => Js.t 'a =
+  "document.getElementById" [@@bs.val];
 
-external setOnKeyDown : Js.t 'a => (Js.t 'b => Js.boolean) => unit = "onkeydown" [@@bs.set];
+external setOnKeyDown : Js.t 'a => (Js.t 'b => Js.boolean) => unit =
+  "onkeydown" [@@bs.set];
 
 external getValue : Js.t 'a => string = "value" [@@bs.get];
 
@@ -20,7 +64,8 @@ external getScrollHeight : Js.t 'a => int = "scrollHeight" [@@bs.get];
 
 external appendChild : Js.t 'a => Js.t 'b => unit = "appendChild" [@@bs.send];
 
-external createElement : string => Js.t 'a = "document.createElement" [@@bs.val];
+external createElement : string => Js.t 'a =
+  "document.createElement" [@@bs.val];
 
 external setInnerHtml : Js.t 'a => string => unit = "innerHTML" [@@bs.set];
 
@@ -28,9 +73,9 @@ let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 
 Random.self_init ();
 
-let process_input (in_str: string) (state: Eval.t) cb::cb :unit =>
+let process_input (in_str: string) (state: Eval.t) ::cb :unit =>
   switch (Parse.parse_single in_str) {
-  | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) state::state cb::cb
+  | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) ::state ::cb
   | Error _ as e => cb (e, state)
   };
 
