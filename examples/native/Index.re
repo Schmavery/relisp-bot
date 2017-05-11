@@ -1,6 +1,21 @@
 open Common;
 
 open Evaluate;
+    /* let read_lib (name: string) ::cb => { */
+    /*   let ic = open_in ("lib/" ^ name ^ ".lib"); */
+    /*   let try_read () => */
+    /*     try (Some (input_line ic)) { */
+    /*     | End_of_file => None */
+    /*     }; */
+    /*   let rec loop acc => */
+    /*     switch (try_read ()) { */
+    /*     | Some s => loop [s, ...acc] */
+    /*     | None => */
+    /*       close_in ic; */
+    /*       List.rev acc */
+    /*     }; */
+    /*   loop [] |> String.concat "" |> cb */
+    /* }; */
 
 let process_input (in_str: string) (state: Eval.t) cb :unit =>
   switch (Parse.parse_single in_str) {

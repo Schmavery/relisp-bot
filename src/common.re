@@ -21,7 +21,7 @@ and nativeFuncT =
   cb::((result astNodeT astNodeT, evaluationStateT) => unit) =>
   unit
 and nativeFuncRecT = {func: nativeFuncT, is_macro: bool}
-and ctxT = {argsUuidMap: StringMap.t astNodeT, argsTable: StringMap.t string, depth: int}
+and ctxT = {argsUuidMap: StringMap.t astNodeT, argsTable: StringMap.t uuidT, depth: int}
 and valueT =
   | Ident string
   | Str string
