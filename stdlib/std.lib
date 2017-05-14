@@ -1,7 +1,41 @@
-(define test 1)
-
 (define nil (quote ()))
 
-(define nil? (lambda (x) (equal? nil x)))
+(define nil? (lambda (x) (= nil x)))
 
 (define identity (lambda (x) x))
+
+(define list (lambda (... args) args))
+
+(define cond (macro (x ... rest)
+  (syntax-quote (if (unquote (car x))
+       (unquote (car (cdr x)))
+        (if (unquote (nil? rest))
+          ()
+          (cond (unquote-splice rest)))))))
+
+(define car'
+  (lambda (arrs)
+  (if (nil? arrs)
+    nil
+    (cons
+      (car (car arrs))
+      (recur (cdr arrs))))))
+
+(define and
+  (macro (x ... args)
+    (if (nil? args)
+      x
+      (syntax-quote (if (unquote x) (recur (unquote-splice args)) false)))))
+
+(define or
+  (macro (x ... args)
+    (if (nil? args)
+      x
+      (syntax-quote (if (unquote x) true (recur (unquote-splice args)))))))
+
+(define has-nil?
+  (lambda (arr)
+  (if (nil? arr)
+    false
+    ;(nil? (car arr))
+    (or (nil? (car arr)) (has-nil? (cdr arr))))))

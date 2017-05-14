@@ -132,7 +132,7 @@ module Builtins (Environment: EnvironmentT) => {
       | [] => Ok (List.rev acc, None)
       | [{value: Ident "..."}, {value: Ident vararg}] =>
         Ok (List.rev acc, Some vararg)
-      | [{value: Ident "..."}, ...tl] =>
+      | [{value: Ident "..."}, ..._] =>
         Error "Can only have ... before the last argument name."
       | [{value: Ident ident}, ...tl] => parse_lambda_args tl [ident, ...acc]
       | _ => Error "Argument defined as not identifier in function definition."
@@ -140,6 +140,7 @@ module Builtins (Environment: EnvironmentT) => {
     let parse_lambda_args args => parse_lambda_args args [];
     let create_lambda_func is_macro args ::ctx ::state => {
       let uuid = gen_uuid ();
+      let func_name = if is_macro {"macro"} else {"lambda"};
       switch args {
       | [{value: List args}, body] =>
         let arg_names = parse_lambda_args args;
@@ -163,10 +164,12 @@ module Builtins (Environment: EnvironmentT) => {
           }
         }
       | [_, _] => (
-          create_exception "Expected list as first argument in call to 'lambda'",
+          create_exception (
+            "Expected list as first argument in call to '" ^ func_name ^ "'"
+          ),
           state
         )
-      | args => received_error expected::2 ::args name::"lambda" ::state
+      | args => received_error expected::2 ::args name::func_name ::state
       }
     };
     let state =
@@ -268,7 +271,7 @@ module Builtins (Environment: EnvironmentT) => {
                     | (Ok {value: NativeFunc _}, _) =>
                       return (
                         create_exception (
-                          "Cannot rename builtin function [" ^ ident ^ "]."
+                          "Cannot rename builtin function."
                         ),
                         state
                       )
@@ -528,7 +531,7 @@ module Builtins (Environment: EnvironmentT) => {
     let state =
       add_native_lambda
         ::state
-        "equal?"
+        "="
         macro::false
         (
           fun args ::ctx ::state =>
@@ -541,13 +544,50 @@ module Builtins (Environment: EnvironmentT) => {
     let state =
       add_native_lambda
         ::state
+        "car"
+        macro::false
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [{value: List [first, ..._]}] => (Ok first, state)
+            | [{value: List []}] => (
+                create_exception "Called 'car' on empty list",
+                state
+              )
+            | [_] => (create_exception "Expected list in call to 'car'", state)
+            | lst => received_error expected::1 args::lst name::"car" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "cdr"
+        macro::false
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [{value: List [_, ...rest]}] => (
+                Ok (create_node (List rest)),
+                state
+              )
+            | [{value: List []}] => (
+                create_exception "Called 'cdr' on empty list",
+                state
+              )
+            | [_] => (create_exception "Expected list in call to 'cdr'", state)
+            | lst => received_error expected::1 args::lst name::"cdr" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
         "DEBUG/print-scope"
         macro::false
         (
           fun args ::ctx ::state =>
             switch args {
             | [{value: Func {scope}}] =>
-              print_endline (string_of_stringmap scope);
+              print_endline (Common.string_of_stringmap scope);
               (Ok Eval.empty_node, state)
             | lst =>
               received_error
