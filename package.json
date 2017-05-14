@@ -18,7 +18,7 @@
     "build-deps": "bsb -make-world",
     "watch": "bsb -w",
     "pack": "browserify lib/js/examples/web/index.js > assets/lisp.js",
-    "server": "browserify lib/js/examples/web/index.js > assets/lisp.js && http-server assets",
+    "server": "browserify lib/js/examples/web/index.js > assets/lisp.js && rsync stdlib/* assets/stdlib/ && http-server assets",
     "cli": "node lib/js/examples/node/index.js",
     "deploy": "node scripts/deploy-ghpages.js"
   },
