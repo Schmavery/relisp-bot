@@ -286,17 +286,17 @@ function Builtins(Environment) {
           } else {
             var ident = match[0];
             if (ident === "...") {
-              var tl = args[1];
-              if (tl) {
-                var match$1 = tl[0][/* value */1];
-                if (match$1.tag) {
+              var match$1 = args[1];
+              if (match$1) {
+                var match$2 = match$1[0][/* value */1];
+                if (match$2.tag) {
                   return /* Error */Block.__(1, ["Can only have ... before the last argument name."]);
-                } else if (tl[1]) {
+                } else if (match$1[1]) {
                   return /* Error */Block.__(1, ["Can only have ... before the last argument name."]);
                 } else {
                   return /* Ok */Block.__(0, [/* tuple */[
                               List.rev(acc),
-                              /* Some */[match$1[0]]
+                              /* Some */[match$2[0]]
                             ]]);
                 }
               } else {
@@ -322,6 +322,7 @@ function Builtins(Environment) {
     };
     var create_lambda_func = function (is_macro, args, ctx, state) {
       var uuid = Common.gen_uuid(/* () */0);
+      var func_name = is_macro ? "macro" : "lambda";
       var exit = 0;
       if (args) {
         var match = args[0][/* value */1];
@@ -378,7 +379,7 @@ function Builtins(Environment) {
               exit = 1;
             } else {
               return /* tuple */[
-                      Common.create_exception("Expected list as first argument in call to 'lambda'"),
+                      Common.create_exception("Expected list as first argument in call to '" + (func_name + "'")),
                       state
                     ];
             }
@@ -390,7 +391,7 @@ function Builtins(Environment) {
         exit = 1;
       }
       if (exit === 1) {
-        return received_error(2, args, "lambda", state);
+        return received_error(2, args, func_name, state);
       }
       
     };
@@ -569,7 +570,7 @@ function Builtins(Environment) {
                                 var res = match[0];
                                 if (res[/* value */1].tag === 7) {
                                   return Curry._1($$return, /* tuple */[
-                                              Common.create_exception("Cannot rename builtin function [" + (ident + "].")),
+                                              Common.create_exception("Cannot rename builtin function."),
                                               state
                                             ]);
                                 } else {
@@ -976,7 +977,7 @@ function Builtins(Environment) {
         }
       };
     };
-    var state$15 = add_native_lambda("equal?", /* false */0, function (args, _, state) {
+    var state$15 = add_native_lambda("=", /* false */0, function (args, _, state) {
           var exit = 0;
           if (args) {
             var match = args[1];
@@ -1000,7 +1001,85 @@ function Builtins(Environment) {
           }
           
         }, state$14);
-    var state$16 = add_native_lambda("DEBUG/print-scope", /* false */0, function (args, _, state) {
+    var state$16 = add_native_lambda("car", /* false */0, function (args, _, state) {
+          var exit = 0;
+          if (args) {
+            var match = args[0][/* value */1];
+            if (match.tag === 5) {
+              var match$1 = match[0];
+              if (match$1) {
+                if (args[1]) {
+                  exit = 1;
+                } else {
+                  return /* tuple */[
+                          /* Ok */Block.__(0, [match$1[0]]),
+                          state
+                        ];
+                }
+              } else if (args[1]) {
+                exit = 1;
+              } else {
+                return /* tuple */[
+                        Common.create_exception("Called 'car' on empty list"),
+                        state
+                      ];
+              }
+            } else if (args[1]) {
+              exit = 1;
+            } else {
+              return /* tuple */[
+                      Common.create_exception("Expected list in call to 'car'"),
+                      state
+                    ];
+            }
+          } else {
+            exit = 1;
+          }
+          if (exit === 1) {
+            return received_error(1, args, "car", state);
+          }
+          
+        }, state$15);
+    var state$17 = add_native_lambda("cdr", /* false */0, function (args, _, state) {
+          var exit = 0;
+          if (args) {
+            var match = args[0][/* value */1];
+            if (match.tag === 5) {
+              var match$1 = match[0];
+              if (match$1) {
+                if (args[1]) {
+                  exit = 1;
+                } else {
+                  return /* tuple */[
+                          /* Ok */Block.__(0, [Common.create_node(/* List */Block.__(5, [match$1[1]]))]),
+                          state
+                        ];
+                }
+              } else if (args[1]) {
+                exit = 1;
+              } else {
+                return /* tuple */[
+                        Common.create_exception("Called 'cdr' on empty list"),
+                        state
+                      ];
+              }
+            } else if (args[1]) {
+              exit = 1;
+            } else {
+              return /* tuple */[
+                      Common.create_exception("Expected list in call to 'cdr'"),
+                      state
+                    ];
+            }
+          } else {
+            exit = 1;
+          }
+          if (exit === 1) {
+            return received_error(1, args, "cdr", state);
+          }
+          
+        }, state$16);
+    var state$18 = add_native_lambda("DEBUG/print-scope", /* false */0, function (args, _, state) {
           var exit = 0;
           if (args) {
             var match = args[0][/* value */1];
@@ -1024,7 +1103,7 @@ function Builtins(Environment) {
             return received_error(1, args, "DEBUG/print-scope", state);
           }
           
-        }, state$15);
+        }, state$17);
     return add_native_lambda("DEBUG/print-state", /* false */0, function (args, _, state) {
                 if (args) {
                   return received_error(0, args, "DEBUG/print-state", state);
@@ -1035,7 +1114,7 @@ function Builtins(Environment) {
                           state
                         ];
                 }
-              }, state$16);
+              }, state$18);
   };
   return /* module */[
           /* received_error */received_error,
@@ -1156,13 +1235,25 @@ function string_of_ast(ast) {
   }
 }
 
-exports.StringMap        = StringMap;
-exports.gen_uuid         = gen_uuid;
-exports.stringmap_get    = stringmap_get;
-exports.stringmap_union  = stringmap_union;
-exports.create_node      = create_node;
-exports.create_exception = create_exception;
-exports.string_of_ast    = string_of_ast;
+function string_of_stringmap(table) {
+  return Curry._3(StringMap[/* fold */10], function (k, v, a) {
+              return a + (k + (":\t" + (v + "\n")));
+            }, table, "");
+}
+
+function string_of_state(state) {
+  return "====state====\nuserTable:\n" + (string_of_stringmap(state[/* userTable */0]) + ("-------------\nsymbolTable:\n" + (string_of_stringmap(state[/* symbolTable */1]) + "\n=============")));
+}
+
+exports.StringMap           = StringMap;
+exports.gen_uuid            = gen_uuid;
+exports.stringmap_get       = stringmap_get;
+exports.stringmap_union     = stringmap_union;
+exports.create_node         = create_node;
+exports.create_exception    = create_exception;
+exports.string_of_ast       = string_of_ast;
+exports.string_of_stringmap = string_of_stringmap;
+exports.string_of_state     = string_of_state;
 /* StringMap Not a pure module */
 
 },{"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/curry.js":28,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/map.js":34,"bs-platform/lib/js/pervasives.js":36,"bs-platform/lib/js/printf.js":37,"bs-platform/lib/js/random.js":38,"bs-platform/lib/js/string.js":39}],4:[function(require,module,exports){
@@ -1507,7 +1598,7 @@ function eval_lambda(called_func, args, _, ctx, state, cb) {
                     throw [
                           Caml_builtin_exceptions.assert_failure,
                           [
-                            "evaluate.re",
+                            "Evaluate.re",
                             272,
                             19
                           ]
@@ -1577,7 +1668,6 @@ var Block                   = require("bs-platform/lib/js/block.js");
 var Common                  = require("./common.js");
 var $$String                = require("bs-platform/lib/js/string.js");
 var Evaluate                = require("./evaluate.js");
-var Pervasives              = require("bs-platform/lib/js/pervasives.js");
 var Caml_format             = require("bs-platform/lib/js/caml_format.js");
 var Caml_string             = require("bs-platform/lib/js/caml_string.js");
 var Caml_builtin_exceptions = require("bs-platform/lib/js/caml_builtin_exceptions.js");
@@ -1718,12 +1808,19 @@ function parse_ident(_stream, _acc) {
     if (match) {
       var c = match[0];
       var exit$1 = 0;
-      if (c >= 11) {
-        var switcher = c - 32 | 0;
-        if (switcher > 9 || switcher < 0) {
+      var switcher = c - 11 | 0;
+      if (switcher > 47 || switcher < 0) {
+        if ((switcher + 2 >>> 0) > 50) {
           exit$1 = 2;
         } else {
-          switch (switcher) {
+          exit = 1;
+        }
+      } else {
+        var switcher$1 = switcher - 21 | 0;
+        if (switcher$1 > 9 || switcher$1 < 0) {
+          exit$1 = 2;
+        } else {
+          switch (switcher$1) {
             case 1 : 
             case 3 : 
             case 4 : 
@@ -1741,10 +1838,6 @@ function parse_ident(_stream, _acc) {
             
           }
         }
-      } else if (c >= 9) {
-        exit = 1;
-      } else {
-        exit$1 = 2;
       }
       if (exit$1 === 2) {
         _acc = append_char(acc, c);
@@ -1759,7 +1852,7 @@ function parse_ident(_stream, _acc) {
     if (exit === 1) {
       switch (acc) {
         case "" : 
-            return Pervasives.failwith("Parsed empty identifier");
+            return /* ParseFail */Block.__(1, ["Parsed empty identifier"]);
         case "false" : 
             return /* ParseOk */Block.__(0, [/* tuple */[
                         stream,
@@ -1789,7 +1882,7 @@ function parse_num(_stream, _acc) {
     var exit = 0;
     if (match) {
       var c = match[0];
-      if (c > 57 || c < 49) {
+      if (c > 57 || c < 48) {
         exit = 1;
       } else {
         _acc = append_char(acc, c);
@@ -1821,25 +1914,48 @@ function parse_num(_stream, _acc) {
   };
 }
 
+function pop_newline(_stream) {
+  while(true) {
+    var stream = _stream;
+    var match = peek(stream);
+    if (match) {
+      if (match[0] !== 10) {
+        _stream = pop(stream);
+        continue ;
+        
+      } else {
+        return pop(stream);
+      }
+    } else {
+      return stream;
+    }
+  };
+}
+
 function parse(_stream) {
   while(true) {
     var stream = _stream;
     var match = peek(stream);
     if (match) {
-      var c = match[0];
-      if (c >= 32) {
-        if (c >= 49) {
-          if (c >= 58) {
+      var match$1 = match[0];
+      if (match$1 >= 41) {
+        if (match$1 >= 58) {
+          if (match$1 !== 59) {
             return parse_ident(stream, "");
           } else {
-            return parse_num(stream, "");
+            _stream = pop_newline(pop(stream));
+            continue ;
+            
           }
-        } else if (c >= 41) {
-          return parse_ident(stream, "");
+        } else if (match$1 >= 49) {
+          return parse_num(stream, "");
         } else {
-          switch (c - 32 | 0) {
+          return parse_ident(stream, "");
+        }
+      } else if (match$1 >= 11) {
+        if (match$1 >= 32) {
+          switch (match$1 - 32 | 0) {
             case 0 : 
-                console.log("popped space");
                 _stream = pop(stream);
                 continue ;
                 case 2 : 
@@ -1855,9 +1971,10 @@ function parse(_stream) {
                 return parse_list(pop(stream), /* [] */0);
             
           }
+        } else {
+          return parse_ident(stream, "");
         }
-      } else if (c === 10 || c === 9) {
-        console.log("popped space");
+      } else if (match$1 >= 9) {
         _stream = pop(stream);
         continue ;
         
@@ -1876,18 +1993,30 @@ function parse_list(_stream, _acc) {
     var stream = _stream;
     var match = peek(stream);
     if (match) {
+      var match$1 = match[0];
       var exit = 0;
-      var switcher = match[0] - 9 | 0;
-      if (switcher > 23 || switcher < 0) {
-        if (switcher !== 32) {
-          exit = 1;
+      if (match$1 >= 33) {
+        if (match$1 !== 41) {
+          if (match$1 !== 59) {
+            exit = 1;
+          } else {
+            return parse(pop_newline(pop(stream)));
+          }
         } else {
           return /* ParseOk */Block.__(0, [/* tuple */[
                       pop(stream),
                       Common.create_node(/* List */Block.__(5, [List.rev(acc)]))
                     ]]);
         }
-      } else if (switcher > 22 || switcher < 2) {
+      } else if (match$1 >= 11) {
+        if (match$1 >= 32) {
+          _stream = pop(stream);
+          continue ;
+          
+        } else {
+          exit = 1;
+        }
+      } else if (match$1 >= 9) {
         _stream = pop(stream);
         continue ;
         
@@ -1901,12 +2030,12 @@ function parse_list(_stream, _acc) {
         } else if (e.tag) {
           return e;
         } else {
-          var match$1 = e[0];
+          var match$2 = e[0];
           _acc = /* :: */[
-            match$1[1],
+            match$2[1],
             acc
           ];
-          _stream = match$1[0];
+          _stream = match$2[0];
           continue ;
           
         }
@@ -1947,6 +2076,24 @@ function parse_multi(s) {
   };
 }
 
+function trim_comments(_stream) {
+  while(true) {
+    var stream = _stream;
+    var match = peek(stream);
+    if (match) {
+      if (match[0] !== 59) {
+        return stream;
+      } else {
+        _stream = pop_newline(pop(stream));
+        continue ;
+        
+      }
+    } else {
+      return stream;
+    }
+  };
+}
+
 function parse_single(s) {
   var stream = create(s);
   var match = parse(stream);
@@ -1956,27 +2103,29 @@ function parse_single(s) {
     return Common.create_exception(match[0]);
   } else {
     var match$1 = match[0];
-    var match$2 = peek(match$1[0]);
+    var match$2 = peek(trim_comments(match$1[0]));
     if (match$2) {
-      return Common.create_exception("Unexpected character " + (append_char("", match$2[0]) + "."));
+      return Common.create_exception("Unexpected character [" + (append_char("", match$2[0]) + "]."));
     } else {
       return /* Ok */Block.__(0, [match$1[1]]);
     }
   }
 }
 
-exports.Stream       = Stream;
-exports.append_char  = append_char;
-exports.parse_string = parse_string;
-exports.parse_ident  = parse_ident;
-exports.parse_num    = parse_num;
-exports.parse        = parse;
-exports.parse_list   = parse_list;
-exports.parse_multi  = parse_multi;
-exports.parse_single = parse_single;
+exports.Stream        = Stream;
+exports.append_char   = append_char;
+exports.parse_string  = parse_string;
+exports.parse_ident   = parse_ident;
+exports.parse_num     = parse_num;
+exports.pop_newline   = pop_newline;
+exports.parse         = parse;
+exports.parse_list    = parse_list;
+exports.parse_multi   = parse_multi;
+exports.trim_comments = trim_comments;
+exports.parse_single  = parse_single;
 /* Common Not a pure module */
 
-},{"./common.js":3,"./evaluate.js":4,"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/caml_builtin_exceptions.js":11,"bs-platform/lib/js/caml_format.js":15,"bs-platform/lib/js/caml_string.js":22,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/pervasives.js":36,"bs-platform/lib/js/string.js":39}],6:[function(require,module,exports){
+},{"./common.js":3,"./evaluate.js":4,"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/caml_builtin_exceptions.js":11,"bs-platform/lib/js/caml_format.js":15,"bs-platform/lib/js/caml_string.js":22,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/string.js":39}],6:[function(require,module,exports){
 'use strict';
 
 var Curry                   = require("./curry.js");
