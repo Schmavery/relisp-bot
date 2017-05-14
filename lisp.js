@@ -1156,25 +1156,13 @@ function string_of_ast(ast) {
   }
 }
 
-function string_of_stringmap(table) {
-  return Curry._3(StringMap[/* fold */10], function (k, v, a) {
-              return a + (k + (":\t" + (v + "\n")));
-            }, table, "");
-}
-
-function string_of_state(state) {
-  return "====state====\nuserTable:\n" + (string_of_stringmap(state[/* userTable */0]) + ("-------------\nsymbolTable:\n" + (string_of_stringmap(state[/* symbolTable */1]) + "\n=============")));
-}
-
-exports.StringMap           = StringMap;
-exports.gen_uuid            = gen_uuid;
-exports.stringmap_get       = stringmap_get;
-exports.stringmap_union     = stringmap_union;
-exports.create_node         = create_node;
-exports.create_exception    = create_exception;
-exports.string_of_ast       = string_of_ast;
-exports.string_of_stringmap = string_of_stringmap;
-exports.string_of_state     = string_of_state;
+exports.StringMap        = StringMap;
+exports.gen_uuid         = gen_uuid;
+exports.stringmap_get    = stringmap_get;
+exports.stringmap_union  = stringmap_union;
+exports.create_node      = create_node;
+exports.create_exception = create_exception;
+exports.string_of_ast    = string_of_ast;
 /* StringMap Not a pure module */
 
 },{"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/curry.js":28,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/map.js":34,"bs-platform/lib/js/pervasives.js":36,"bs-platform/lib/js/printf.js":37,"bs-platform/lib/js/random.js":38,"bs-platform/lib/js/string.js":39}],4:[function(require,module,exports){
@@ -1409,18 +1397,23 @@ function $$eval(_original_node, ctx, state, _cb) {
                       exit = 1;
                       break;
                   case 7 : 
-                      if (match[0][/* is_macro */1]) {
-                        func = func$1;
-                        exit = 1;
+                      var f = match[0];
+                      if (f[/* is_macro */1]) {
+                        if (f[/* is_macro */1]) {
+                          return eval_lambda(func$1, args, name, ctx, state, function (res) {
+                                      var match = res[0];
+                                      if (match.tag) {
+                                        return Curry._1(cb, res);
+                                      } else {
+                                        return $$eval(match[0], ctx, res[1], cb);
+                                      }
+                                    });
+                        } else {
+                          func = func$1;
+                          exit = 1;
+                        }
                       } else {
-                        return eval_lambda(func$1, args, name, ctx, state, function (res) {
-                                    var match = res[0];
-                                    if (match.tag) {
-                                      return Curry._1(cb, res);
-                                    } else {
-                                      return $$eval(match[0], ctx, res[1], cb);
-                                    }
-                                  });
+                        return eval_lambda(func$1, args, name, ctx, state, cb);
                       }
                       break;
                   default:
@@ -1514,8 +1507,8 @@ function eval_lambda(called_func, args, _, ctx, state, cb) {
                     throw [
                           Caml_builtin_exceptions.assert_failure,
                           [
-                            "Evaluate.re",
-                            266,
+                            "evaluate.re",
+                            272,
                             19
                           ]
                         ];
@@ -1584,6 +1577,7 @@ var Block                   = require("bs-platform/lib/js/block.js");
 var Common                  = require("./common.js");
 var $$String                = require("bs-platform/lib/js/string.js");
 var Evaluate                = require("./evaluate.js");
+var Pervasives              = require("bs-platform/lib/js/pervasives.js");
 var Caml_format             = require("bs-platform/lib/js/caml_format.js");
 var Caml_string             = require("bs-platform/lib/js/caml_string.js");
 var Caml_builtin_exceptions = require("bs-platform/lib/js/caml_builtin_exceptions.js");
@@ -1765,7 +1759,7 @@ function parse_ident(_stream, _acc) {
     if (exit === 1) {
       switch (acc) {
         case "" : 
-            return /* ParseFail */Block.__(1, ["Parsed empty identifier"]);
+            return Pervasives.failwith("Parsed empty identifier");
         case "false" : 
             return /* ParseOk */Block.__(0, [/* tuple */[
                         stream,
@@ -1795,7 +1789,7 @@ function parse_num(_stream, _acc) {
     var exit = 0;
     if (match) {
       var c = match[0];
-      if (c > 57 || c < 48) {
+      if (c > 57 || c < 49) {
         exit = 1;
       } else {
         _acc = append_char(acc, c);
@@ -1845,6 +1839,7 @@ function parse(_stream) {
         } else {
           switch (c - 32 | 0) {
             case 0 : 
+                console.log("popped space");
                 _stream = pop(stream);
                 continue ;
                 case 2 : 
@@ -1862,6 +1857,7 @@ function parse(_stream) {
           }
         }
       } else if (c === 10 || c === 9) {
+        console.log("popped space");
         _stream = pop(stream);
         continue ;
         
@@ -1962,7 +1958,7 @@ function parse_single(s) {
     var match$1 = match[0];
     var match$2 = peek(match$1[0]);
     if (match$2) {
-      return Common.create_exception("Unexpected character [" + (append_char("", match$2[0]) + "]."));
+      return Common.create_exception("Unexpected character " + (append_char("", match$2[0]) + "."));
     } else {
       return /* Ok */Block.__(0, [match$1[1]]);
     }
@@ -1980,7 +1976,7 @@ exports.parse_multi  = parse_multi;
 exports.parse_single = parse_single;
 /* Common Not a pure module */
 
-},{"./common.js":3,"./evaluate.js":4,"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/caml_builtin_exceptions.js":11,"bs-platform/lib/js/caml_format.js":15,"bs-platform/lib/js/caml_string.js":22,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/string.js":39}],6:[function(require,module,exports){
+},{"./common.js":3,"./evaluate.js":4,"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/caml_builtin_exceptions.js":11,"bs-platform/lib/js/caml_format.js":15,"bs-platform/lib/js/caml_string.js":22,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/pervasives.js":36,"bs-platform/lib/js/string.js":39}],6:[function(require,module,exports){
 'use strict';
 
 var Curry                   = require("./curry.js");
