@@ -62,6 +62,7 @@ let rec parse_ident (stream: Stream.t) (acc: string) :parseResult =>
   | Some '('
   | Some ')'
   | Some '"'
+  | Some ';'
   | None =>
     switch acc {
     | "true" => ParseOk (stream, Eval.trueNode)
@@ -86,26 +87,34 @@ let rec parse_num (stream: Stream.t) (acc: string) :parseResult =>
     }
   };
 
+let rec pop_newline (stream: Stream.t) :Stream.t =>
+  switch (Stream.peek stream) {
+  | Some '\n' => (Stream.pop stream)
+  | Some _ => pop_newline (Stream.pop stream)
+  | None => stream
+  };
 
 /** Mututally recursive parse functions **/
 let rec parse (stream: Stream.t) :parseResult =>
   switch (Stream.peek stream) {
   | Some '"' => parse_string (Stream.pop stream) ""
   | Some '(' => parse_list (Stream.pop stream) []
+  | Some ';' => parse (pop_newline (Stream.pop stream))
   | Some ' '
   | Some '\t'
   | Some '\n' => parse (Stream.pop stream)
   | Some '1'..'9' => parse_num stream ""
-  | Some c => parse_ident stream ""
+  | Some _ => parse_ident stream ""
   | None => UnexpectedEnd
   }
 and parse_list (stream: Stream.t) (acc: list astNodeT) :parseResult =>
   switch (Stream.peek stream) {
   | Some ')' => ParseOk (Stream.pop stream, create_node (List (List.rev acc)))
+  | Some ';' => parse (pop_newline (Stream.pop stream))
   | Some ' '
   | Some '\t'
   | Some '\n' => parse_list (Stream.pop stream) acc
-  | Some c =>
+  | Some _ =>
     switch (parse stream) {
     | ParseOk (res_stream, res) => parse_list res_stream [res, ...acc]
     | UnexpectedEnd => ParseFail "Unterminated list."
@@ -131,11 +140,18 @@ let rec parse_multi
 let parse_multi (s: string) :result (list astNodeT) astNodeT =>
   parse_multi (Stream.create s) [];
 
+let rec trim_comments (stream: Stream.t) => {
+  switch (Stream.peek stream) {
+    | Some ';' => trim_comments (pop_newline (Stream.pop stream))
+    | _ => stream
+  }
+};
+
 let parse_single s :result astNodeT astNodeT => {
   let stream = Stream.create s;
   switch (parse stream) {
   | ParseOk (s, node) =>
-    switch (Stream.peek s) {
+    switch (Stream.peek (trim_comments s)) {
     | None => Ok node
     | Some c =>
       create_exception ("Unexpected character [" ^ append_char "" c ^ "].")
