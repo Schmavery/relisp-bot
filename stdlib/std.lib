@@ -27,21 +27,11 @@
       x
       (syntax-quote (if (unquote x) (and (unquote-splice args)) false)))))
 
-; (define or
-;   (macro (x ... args)
-;     (if (nil? args)
-;       (if x true false)
-;       (syntax-quote (if (unquote x) true (or (unquote-splice args)))))))
-; (define or
-;   (macro (x ... args)
-;     (if (nil? args)
-;       (syntax-quote (if (unquote x) true false))
-;       (syntax-quote (if (unquote x) true (or (unquote-splice args)))))))
 (define or
   (macro (x ... args)
     (if (nil? args)
       x
-      (syntax-quote (if (unquote x) true (recur (unquote-splice args)))))))
+      (syntax-quote (if (unquote x) true (or (unquote-splice args)))))))
 
 (define has-nil?
   (lambda (arr)
