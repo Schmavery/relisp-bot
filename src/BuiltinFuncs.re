@@ -270,9 +270,7 @@ module Builtins (Environment: EnvironmentT) => {
                     fun
                     | (Ok {value: NativeFunc _}, _) =>
                       return (
-                        create_exception (
-                          "Cannot rename builtin function."
-                        ),
+                        create_exception "Cannot rename builtin function.",
                         state
                       )
                     | (Ok res, state) =>
@@ -333,6 +331,7 @@ module Builtins (Environment: EnvironmentT) => {
       | [v, ...tl] =>
         switch v {
         | {value: List [{value: Ident "unquote-splice"}, unquote_arg]} =>
+        /* Eval.resolve_ident */
           Eval.eval
             unquote_arg
             ::ctx
@@ -609,6 +608,46 @@ module Builtins (Environment: EnvironmentT) => {
               received_error
                 expected::0 args::lst name::"DEBUG/print-state" ::state
             }
+        );
+    let state =
+      add_native_lambda_async
+        ::state
+        "DEBUG/expand-macro"
+        macro::false
+        (
+          fun args ::ctx state::initial_state ::cb =>{
+            switch args {
+            | [{value: List [first, ...args]}] =>
+              Eval.eval
+                first
+                ::ctx
+                state::initial_state
+                cb::(
+                  fun (evaled_first, state) =>
+                    switch evaled_first {
+                    | Ok ({value: NativeFunc {is_macro: true}} as func)
+                    | Ok ({value: Func {is_macro: true}} as func) =>
+                      Eval.eval_lambda
+                        func ::args ::ctx func_name::"expand" ::state ::cb
+                    | Ok _ as e =>
+                      cb (create_exception (string_of_ast e), initial_state)
+                    | Error _ as e => cb (e, initial_state)
+                    }
+                )
+            | [_] =>
+              cb (
+                create_exception "Expected list in call to 'DEBUG/expand-macro",
+                initial_state
+              )
+            | lst =>
+              cb (
+                received_error
+                  expected::0
+                  args::lst
+                  name::"DEBUG/expand-macro"
+                  state::initial_state
+              )
+            }}
         );
     state
   };

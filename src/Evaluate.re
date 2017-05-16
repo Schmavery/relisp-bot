@@ -173,7 +173,8 @@ module Eval: EvalT = {
           cb::(
             fun (evaled_first, state) =>
               switch evaled_first {
-              | Ok ({value: NativeFunc f} as func) when not f.is_macro =>
+              | Ok ({value: NativeFunc {is_macro: true}} as func)
+              | Ok ({value: Func {is_macro: true}} as func) =>
                 eval_lambda
                   func
                   ::args
@@ -181,14 +182,18 @@ module Eval: EvalT = {
                   func_name::name
                   ::state
                   cb::(
-                    fun res =>
-                      switch res {
-                      | (Ok x, state) => eval x ::ctx ::state ::cb
-                      | (Error _, _) as e => cb e
-                      }
+                    if (name == "quote" || name == "syntax-quote") {
+                      cb
+                    } else {
+                      fun res =>
+                        switch res {
+                        | (Ok x, state) => eval x ::ctx ::state ::cb
+                        | (Error _, _) as e => cb e
+                        }
+                    }
                   )
-              | Ok ({value: NativeFunc _} as func)
-              | Ok ({value: Func _} as func) =>
+              | Ok ({value: NativeFunc {is_macro: false}} as func)
+              | Ok ({value: Func {is_macro: false}} as func) =>
                 eval_lambda func ::args ::ctx func_name::name ::state ::cb
               | Error e => cb (Error e, state)
               | Ok x =>
@@ -205,16 +210,8 @@ module Eval: EvalT = {
       }
     | _ => cb (Ok original_node, state)
     }
-  /* and eval_lambda
-     ({uuid, value: func_value} as called_func: astNodeT)
-     args::(args: list astNodeT)
-     func_name::(func_name: string)
-     ctx::(ctx: ctxT)
-     state::state
-     cb::(cb: (result astNodeT astNodeT, t) => unit)
-     :unit => */
   and eval_lambda
-      ({uuid, value: func_value} as called_func: astNodeT)
+      ({value: func_value} as called_func: astNodeT)
       args::(args: list astNodeT)
       func_name::(func_name: string)
       ctx::(ctx: ctxT)
@@ -242,7 +239,7 @@ module Eval: EvalT = {
                   args ctx::{...ctx, depth: ctx.depth + 1} ::state ::cb
               | (Error _, _) as e => cb e
               }
-            | Func {func, args, scope, is_macro, vararg} =>
+            | Func {func, args, scope, vararg} =>
               switch maybe_args {
               | (Ok passed_args, state) =>
                 let arg_to_node_map =
@@ -253,7 +250,7 @@ module Eval: EvalT = {
                 | Ok map =>
                   let argsUuidMap =
                     StringMap.fold
-                      (fun key value acc => StringMap.add value.uuid value acc)
+                      (fun _k value acc => StringMap.add value.uuid value acc)
                       map
                       ctx.argsUuidMap;
                   let arg_map = StringMap.map (fun value => value.uuid) map;
