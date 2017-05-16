@@ -772,9 +772,15 @@ function Builtins(Environment) {
                                 var match$1 = match[0][/* value */1];
                                 if (match$1.tag === 3) {
                                   if (match$1[0] !== 0) {
-                                    return Curry._4(Evaluate.Eval[/* eval */12], consequent, ctx, evaled_cond[1], $$return);
+                                    return Curry._1($$return, /* tuple */[
+                                                /* Ok */Block.__(0, [consequent]),
+                                                evaled_cond[1]
+                                              ]);
                                   } else {
-                                    return Curry._4(Evaluate.Eval[/* eval */12], alternate, ctx, evaled_cond[1], $$return);
+                                    return Curry._1($$return, /* tuple */[
+                                                /* Ok */Block.__(0, [alternate]),
+                                                evaled_cond[1]
+                                              ]);
                                   }
                                 } else {
                                   return Curry._1($$return, /* tuple */[
