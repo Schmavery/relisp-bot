@@ -1104,17 +1104,101 @@ function Builtins(Environment) {
           }
           
         }, state$17);
-    return add_native_lambda("DEBUG/print-state", /* false */0, function (args, _, state) {
+    var state$19 = add_native_lambda("DEBUG/print-state", /* false */0, function (args, _, state) {
+          if (args) {
+            return received_error(0, args, "DEBUG/print-state", state);
+          } else {
+            console.log(Common.string_of_state(state));
+            return /* tuple */[
+                    /* Ok */Block.__(0, [Evaluate.Eval[/* empty_node */1]]),
+                    state
+                  ];
+          }
+        }, state$18);
+    return add_native_lambda_async("DEBUG/expand-macro", /* false */0, function (args, ctx, initial_state, cb) {
+                var exit = 0;
                 if (args) {
-                  return received_error(0, args, "DEBUG/print-state", state);
+                  var match = args[0][/* value */1];
+                  var exit$1 = 0;
+                  if (match.tag === 5) {
+                    var match$1 = match[0];
+                    if (match$1) {
+                      if (args[1]) {
+                        exit = 1;
+                      } else {
+                        var args$1 = match$1[1];
+                        return Curry._4(Evaluate.Eval[/* eval */12], match$1[0], ctx, initial_state, function (param) {
+                                    var evaled_first = param[0];
+                                    var exit = 0;
+                                    var func;
+                                    if (evaled_first.tag) {
+                                      return Curry._1(cb, /* tuple */[
+                                                  evaled_first,
+                                                  initial_state
+                                                ]);
+                                    } else {
+                                      var func$1 = evaled_first[0];
+                                      var match = func$1[/* value */1];
+                                      var exit$1 = 0;
+                                      switch (match.tag | 0) {
+                                        case 6 : 
+                                            if (match[0][/* is_macro */4] !== 0) {
+                                              func = func$1;
+                                              exit = 1;
+                                            } else {
+                                              exit$1 = 2;
+                                            }
+                                            break;
+                                        case 7 : 
+                                            if (match[0][/* is_macro */1] !== 0) {
+                                              func = func$1;
+                                              exit = 1;
+                                            } else {
+                                              exit$1 = 2;
+                                            }
+                                            break;
+                                        default:
+                                          exit$1 = 2;
+                                      }
+                                      if (exit$1 === 2) {
+                                        return Curry._1(cb, /* tuple */[
+                                                    Common.create_exception(Common.string_of_ast(evaled_first)),
+                                                    initial_state
+                                                  ]);
+                                      }
+                                      
+                                    }
+                                    if (exit === 1) {
+                                      return Curry._6(Evaluate.Eval[/* eval_lambda */13], func, args$1, "expand", ctx, param[1], cb);
+                                    }
+                                    
+                                  });
+                      }
+                    } else {
+                      exit$1 = 2;
+                    }
+                  } else {
+                    exit$1 = 2;
+                  }
+                  if (exit$1 === 2) {
+                    if (args[1]) {
+                      exit = 1;
+                    } else {
+                      return Curry._1(cb, /* tuple */[
+                                  Common.create_exception("Expected list in call to 'DEBUG/expand-macro"),
+                                  initial_state
+                                ]);
+                    }
+                  }
+                  
                 } else {
-                  console.log(Common.string_of_state(state));
-                  return /* tuple */[
-                          /* Ok */Block.__(0, [Evaluate.Eval[/* empty_node */1]]),
-                          state
-                        ];
+                  exit = 1;
                 }
-              }, state$18);
+                if (exit === 1) {
+                  return Curry._1(cb, received_error(0, args, "DEBUG/expand-macro", initial_state));
+                }
+                
+              }, state$19);
   };
   return /* module */[
           /* received_error */received_error,
@@ -1474,51 +1558,56 @@ function $$eval(_original_node, ctx, state, _cb) {
               var evaled_first = param[0];
               var exit = 0;
               var func;
+              var func$1;
               if (evaled_first.tag) {
                 return Curry._1(cb, /* tuple */[
                             /* Error */Block.__(1, [evaled_first[0]]),
                             state
                           ]);
               } else {
-                var func$1 = evaled_first[0];
-                var match = func$1[/* value */1];
+                var func$2 = evaled_first[0];
+                var match = func$2[/* value */1];
                 switch (match.tag | 0) {
                   case 6 : 
-                      func = func$1;
-                      exit = 1;
+                      if (match[0][/* is_macro */4] !== 0) {
+                        func = func$2;
+                        exit = 1;
+                      } else {
+                        func$1 = func$2;
+                        exit = 2;
+                      }
                       break;
                   case 7 : 
-                      var f = match[0];
-                      if (f[/* is_macro */1]) {
-                        if (f[/* is_macro */1]) {
-                          return eval_lambda(func$1, args, name, ctx, state, function (res) {
-                                      var match = res[0];
-                                      if (match.tag) {
-                                        return Curry._1(cb, res);
-                                      } else {
-                                        return $$eval(match[0], ctx, res[1], cb);
-                                      }
-                                    });
-                        } else {
-                          func = func$1;
-                          exit = 1;
-                        }
+                      if (match[0][/* is_macro */1] !== 0) {
+                        func = func$2;
+                        exit = 1;
                       } else {
-                        return eval_lambda(func$1, args, name, ctx, state, cb);
+                        func$1 = func$2;
+                        exit = 2;
                       }
                       break;
                   default:
-                    var node_str = Common.string_of_ast(/* Ok */Block.__(0, [func$1]));
+                    var node_str = Common.string_of_ast(/* Ok */Block.__(0, [func$2]));
                     return Curry._1(cb, /* tuple */[
                                 Common.create_exception("Trying to call something that isn't a function. [" + (node_str + "]")),
                                 state
                               ]);
                 }
               }
-              if (exit === 1) {
-                return eval_lambda(func, args, name, ctx, state, cb);
+              switch (exit) {
+                case 1 : 
+                    return eval_lambda(func, args, name, ctx, state, name === "quote" || name === "syntax-quote" ? cb : function (res) {
+                                  var match = res[0];
+                                  if (match.tag) {
+                                    return Curry._1(cb, res);
+                                  } else {
+                                    return $$eval(match[0], ctx, res[1], cb);
+                                  }
+                                });
+                case 2 : 
+                    return eval_lambda(func$1, args, name, ctx, state, cb);
+                
               }
-              
             }
             }(cb,args,name));
             _original_node = first;
@@ -1599,7 +1688,7 @@ function eval_lambda(called_func, args, _, ctx, state, cb) {
                           Caml_builtin_exceptions.assert_failure,
                           [
                             "Evaluate.re",
-                            272,
+                            263,
                             19
                           ]
                         ];
@@ -2000,7 +2089,9 @@ function parse_list(_stream, _acc) {
           if (match$1 !== 59) {
             exit = 1;
           } else {
-            return parse(pop_newline(pop(stream)));
+            _stream = pop_newline(pop(stream));
+            continue ;
+            
           }
         } else {
           return /* ParseOk */Block.__(0, [/* tuple */[
