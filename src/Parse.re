@@ -33,6 +33,8 @@ type parseResult =
 
 let append_char (s: string) (c: char) :string => s ^ String.make 1 c;
 
+let peek_second stream => Stream.peek (Stream.pop stream);
+
 
 /** atom parsers **/
 let rec parse_string (stream: Stream.t) (acc: string) :parseResult =>
@@ -94,17 +96,52 @@ let rec pop_newline (stream: Stream.t) :Stream.t =>
   | None => stream
   };
 
+let wrap_quote_sugar ident_name inner_val =>
+  switch inner_val {
+  | ParseOk (stream, node) =>
+    ParseOk (stream, create_node (List [create_node (Ident ident_name), node]))
+  | ParseFail "Unexpected whitespace" =>
+    ParseFail ("Unexpected whitespace after " ^ ident_name)
+  | ParseFail _ as f => f
+  | UnexpectedEnd => UnexpectedEnd
+  };
+
 
 /** Mututally recursive parse functions **/
 let rec parse (stream: Stream.t) :parseResult =>
   switch (Stream.peek stream) {
-  | Some '"' => parse_string (Stream.pop stream) ""
-  | Some '(' => parse_list (Stream.pop stream) []
   | Some ';' => parse (pop_newline (Stream.pop stream))
   | Some ' '
   | Some '\t'
   | Some '\n' => parse (Stream.pop stream)
+  | Some '\'' =>
+    wrap_quote_sugar "quote" (parse_no_leading_whitespace (Stream.pop stream))
+  | Some '`' =>
+    wrap_quote_sugar
+      "syntax-quote" (parse_no_leading_whitespace (Stream.pop stream))
+  | Some '~' =>
+    switch (peek_second stream) {
+    | Some '@' =>
+      wrap_quote_sugar
+        "unquote-splice"
+        (parse_no_leading_whitespace (Stream.pop (Stream.pop stream)))
+    | Some _ =>
+      wrap_quote_sugar
+        "unquote" (parse_no_leading_whitespace (Stream.pop stream))
+    | None => UnexpectedEnd
+    }
+  | Some _ => parse_no_leading_whitespace stream
+  | None => UnexpectedEnd
+  }
+and parse_no_leading_whitespace (stream: Stream.t) :parseResult =>
+  switch (Stream.peek stream) {
+  | Some '"' => parse_string (Stream.pop stream) ""
+  | Some '(' => parse_list (Stream.pop stream) []
   | Some '1'..'9' => parse_num stream ""
+  | Some ';'
+  | Some ' '
+  | Some '\t'
+  | Some '\n' => ParseFail "Unexpected whitespace"
   | Some _ => parse_ident stream ""
   | None => UnexpectedEnd
   }
