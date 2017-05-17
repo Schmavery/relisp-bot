@@ -142,6 +142,7 @@ and parse_no_leading_whitespace (stream: Stream.t) :parseResult =>
   | Some ' '
   | Some '\t'
   | Some '\n' => ParseFail "Unexpected whitespace"
+  | Some ')' => ParseFail "Unexpected close paren"
   | Some _ => parse_ident stream ""
   | None => UnexpectedEnd
   }
