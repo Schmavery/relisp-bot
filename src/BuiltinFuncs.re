@@ -331,7 +331,6 @@ module Builtins (Environment: EnvironmentT) => {
       | [v, ...tl] =>
         switch v {
         | {value: List [{value: Ident "unquote-splice"}, unquote_arg]} =>
-        /* Eval.resolve_ident */
           Eval.eval
             unquote_arg
             ::ctx
@@ -423,7 +422,7 @@ module Builtins (Environment: EnvironmentT) => {
                     | ((Error _, _) as e, _, _) => return e
                     | ((Ok {value: Bool true}, state), eval_me, _)
                     | ((Ok {value: Bool false}, state), _, eval_me) =>
-                      Eval.eval eval_me ::state ::ctx cb::return
+                      return (Ok eval_me, state)
                     | ((Ok _, state), _, _) =>
                       return (
                         create_exception "First argument to 'if' must evaluate to boolean.",
