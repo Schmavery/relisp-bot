@@ -5,55 +5,64 @@ open Evaluate;
 module Environment: BuiltinFuncs.EnvironmentT = {
   type errorT;
   external readFile :
-    string => _ [@bs.as "utf8"] => (errorT => Js.Undefined.t string => unit) => unit =
+    string =>
+    _ [@bs.as "utf8"] =>
+    (errorT => Js.Undefined.t string => unit) =>
+    unit =
     "" [@@bs.module "fs"];
   let load_lib filename ::cb =>
-    readFile ("stdlib/" ^ filename ^ ".lib") (fun _ str => cb (Js.Undefined.to_opt str));
+    readFile
+      ("stdlib/" ^ filename ^ ".lib")
+      (fun _ str => cb (Js.Undefined.to_opt str));
 };
 
 module Builtins = BuiltinFuncs.Builtins Environment;
 
-type stdinT;
+type rlPipeT;
 
-type indataT;
+type rlInterfaceDefT;
 
-external openStdin : unit => stdinT = "process.openStdin" [@@bs.val];
+type rlInterfaceT;
 
-external addDataListener : _ [@bs.as "data"] => (indataT => unit) => unit =
-  "addListener" [@@bs.send.pipe : stdinT];
+external createRLInterfaceDef :
+  input::rlPipeT => output::rlPipeT => rlInterfaceDefT =
+  "" [@@bs.obj];
 
-external toString : 'a => string = "toString" [@@bs.send];
+external createRLInterface : rlInterfaceDefT => rlInterfaceT =
+  "createInterface" [@@bs.module "readline"];
 
-let lastState = ref (Some (Builtins.add_builtins Eval.empty));
+external rlQuestion : rlInterfaceT => string => (string => unit) => unit =
+  "question" [@@bs.send];
+
+external stdin : rlPipeT = "process.stdin" [@@bs.val];
+
+external stdout : rlPipeT = "process.stdout" [@@bs.val];
+
+let rlDef = createRLInterfaceDef input::stdin output::stdout;
+
+let rl = createRLInterface rlDef;
 
 Random.self_init ();
 
-let process_input (in_str: string) (state: Eval.t) ::cb :unit =>
+let process_input (state: Eval.t) ::cb in_str :unit =>
   switch (Parse.parse_single in_str) {
   | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) ::state ::cb
   | Error _ as e => cb (e, state)
   };
 
-openStdin () |>
-addDataListener (
-  fun d => {
-    let in_str = String.trim (toString d);
-    switch !lastState {
-    | None => print_endline ""
-    | Some state =>
-      lastState := None;
+let rec prompt state =>
+  rlQuestion
+    rl
+    "> "
+    (
       process_input
-        in_str
         state
         cb::(
-          fun (res, new_state) => {
-            lastState := Some new_state;
-            string_of_ast res |> print_endline;
-            print_string "> "
+          fun (result, state) => {
+            print_endline (string_of_ast result);
+            prompt state
           }
         )
-    }
-  }
-);
+    );
 
-print_string "> ";
+prompt (Builtins.add_builtins Eval.empty);
