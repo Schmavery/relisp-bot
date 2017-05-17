@@ -1292,7 +1292,7 @@ function string_of_ast(ast) {
       case 0 : 
           return match[0];
       case 1 : 
-          return "'" + (match[0] + "'");
+          return "\"" + (match[0] + "\"");
       case 2 : 
           return Pervasives.string_of_float(match[0]);
       case 3 : 
@@ -1817,6 +1817,10 @@ function append_char(s, c) {
   return s + $$String.make(1, c);
 }
 
+function peek_second(stream) {
+  return peek(pop(stream));
+}
+
 function parse_string(_stream, _acc) {
   while(true) {
     var acc = _acc;
@@ -2027,59 +2031,128 @@ function pop_newline(_stream) {
   };
 }
 
+function wrap_quote_sugar(ident_name, inner_val) {
+  if (typeof inner_val === "number") {
+    return /* UnexpectedEnd */0;
+  } else if (inner_val.tag) {
+    if (inner_val[0] === "Unexpected whitespace") {
+      return /* ParseFail */Block.__(1, ["Unexpected whitespace after " + ident_name]);
+    } else {
+      return inner_val;
+    }
+  } else {
+    var match = inner_val[0];
+    return /* ParseOk */Block.__(0, [/* tuple */[
+                match[0],
+                Common.create_node(/* List */Block.__(5, [/* :: */[
+                          Common.create_node(/* Ident */Block.__(0, [ident_name])),
+                          /* :: */[
+                            match[1],
+                            /* [] */0
+                          ]
+                        ]]))
+              ]]);
+  }
+}
+
 function parse(_stream) {
   while(true) {
     var stream = _stream;
     var match = peek(stream);
     if (match) {
       var match$1 = match[0];
-      if (match$1 >= 41) {
-        if (match$1 >= 58) {
-          if (match$1 !== 59) {
-            return parse_ident(stream, "");
+      if (match$1 >= 40) {
+        if (match$1 !== 59) {
+          if (match$1 !== 96) {
+            if (match$1 !== 126) {
+              return parse_no_leading_whitespace(stream);
+            } else {
+              var match$2 = peek_second(stream);
+              if (match$2) {
+                if (match$2[0] !== 64) {
+                  return wrap_quote_sugar("unquote", parse_no_leading_whitespace(pop(stream)));
+                } else {
+                  return wrap_quote_sugar("unquote-splice", parse_no_leading_whitespace(pop(pop(stream))));
+                }
+              } else {
+                return /* UnexpectedEnd */0;
+              }
+            }
           } else {
-            _stream = pop_newline(pop(stream));
-            continue ;
-            
-          }
-        } else if (match$1 >= 49) {
-          return parse_num(stream, "");
-        } else {
-          return parse_ident(stream, "");
-        }
-      } else if (match$1 >= 11) {
-        if (match$1 >= 32) {
-          switch (match$1 - 32 | 0) {
-            case 0 : 
-                _stream = pop(stream);
-                continue ;
-                case 2 : 
-                return parse_string(pop(stream), "");
-            case 1 : 
-            case 3 : 
-            case 4 : 
-            case 5 : 
-            case 6 : 
-            case 7 : 
-                return parse_ident(stream, "");
-            case 8 : 
-                return parse_list(pop(stream), /* [] */0);
-            
+            return wrap_quote_sugar("syntax-quote", parse_no_leading_whitespace(pop(stream)));
           }
         } else {
-          return parse_ident(stream, "");
+          _stream = pop_newline(pop(stream));
+          continue ;
+          
         }
-      } else if (match$1 >= 9) {
-        _stream = pop(stream);
-        continue ;
-        
       } else {
-        return parse_ident(stream, "");
+        var switcher = match$1 - 9 | 0;
+        if (switcher > 23 || switcher < 0) {
+          if (switcher >= 30) {
+            return wrap_quote_sugar("quote", parse_no_leading_whitespace(pop(stream)));
+          } else {
+            return parse_no_leading_whitespace(stream);
+          }
+        } else if (switcher > 22 || switcher < 2) {
+          _stream = pop(stream);
+          continue ;
+          
+        } else {
+          return parse_no_leading_whitespace(stream);
+        }
       }
     } else {
       return /* UnexpectedEnd */0;
     }
   };
+}
+
+function parse_no_leading_whitespace(stream) {
+  var match = peek(stream);
+  if (match) {
+    var match$1 = match[0];
+    if (match$1 >= 41) {
+      if (match$1 >= 58) {
+        if (match$1 !== 59) {
+          return parse_ident(stream, "");
+        } else {
+          return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
+        }
+      } else if (match$1 >= 49) {
+        return parse_num(stream, "");
+      } else {
+        return parse_ident(stream, "");
+      }
+    } else if (match$1 >= 11) {
+      if (match$1 >= 32) {
+        switch (match$1 - 32 | 0) {
+          case 0 : 
+              return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
+          case 2 : 
+              return parse_string(pop(stream), "");
+          case 1 : 
+          case 3 : 
+          case 4 : 
+          case 5 : 
+          case 6 : 
+          case 7 : 
+              return parse_ident(stream, "");
+          case 8 : 
+              return parse_list(pop(stream), /* [] */0);
+          
+        }
+      } else {
+        return parse_ident(stream, "");
+      }
+    } else if (match$1 >= 9) {
+      return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
+    } else {
+      return parse_ident(stream, "");
+    }
+  } else {
+    return /* UnexpectedEnd */0;
+  }
 }
 
 function parse_list(_stream, _acc) {
@@ -2209,17 +2282,20 @@ function parse_single(s) {
   }
 }
 
-exports.Stream        = Stream;
-exports.append_char   = append_char;
-exports.parse_string  = parse_string;
-exports.parse_ident   = parse_ident;
-exports.parse_num     = parse_num;
-exports.pop_newline   = pop_newline;
-exports.parse         = parse;
-exports.parse_list    = parse_list;
-exports.parse_multi   = parse_multi;
-exports.trim_comments = trim_comments;
-exports.parse_single  = parse_single;
+exports.Stream                      = Stream;
+exports.append_char                 = append_char;
+exports.peek_second                 = peek_second;
+exports.parse_string                = parse_string;
+exports.parse_ident                 = parse_ident;
+exports.parse_num                   = parse_num;
+exports.pop_newline                 = pop_newline;
+exports.wrap_quote_sugar            = wrap_quote_sugar;
+exports.parse                       = parse;
+exports.parse_no_leading_whitespace = parse_no_leading_whitespace;
+exports.parse_list                  = parse_list;
+exports.parse_multi                 = parse_multi;
+exports.trim_comments               = trim_comments;
+exports.parse_single                = parse_single;
 /* Common Not a pure module */
 
 },{"./common.js":3,"./evaluate.js":4,"bs-platform/lib/js/block.js":7,"bs-platform/lib/js/caml_builtin_exceptions.js":11,"bs-platform/lib/js/caml_format.js":15,"bs-platform/lib/js/caml_string.js":22,"bs-platform/lib/js/list.js":33,"bs-platform/lib/js/string.js":39}],6:[function(require,module,exports){
