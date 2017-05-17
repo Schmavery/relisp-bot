@@ -90,7 +90,7 @@ let rec string_of_ast (ast: result astNodeT astNodeT) :string => {
   | Ok value =>
     switch value.value {
     | Ident x => x
-    | Str x => "'" ^ x ^ "'"
+    | Str x => "\"" ^ x ^ "\""
     | Num x => string_of_float x
     | Bool x => string_of_bool x
     | Ref _ => "[Ref]"
