@@ -2112,38 +2112,48 @@ function parse_no_leading_whitespace(stream) {
   var match = peek(stream);
   if (match) {
     var match$1 = match[0];
-    if (match$1 >= 41) {
-      if (match$1 >= 58) {
-        if (match$1 !== 59) {
-          return parse_ident(stream, "");
-        } else {
-          return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
-        }
-      } else if (match$1 >= 49) {
-        return parse_num(stream, "");
-      } else {
+    if (match$1 >= 11) {
+      var switcher = match$1 - 32 | 0;
+      if (switcher > 27 || switcher < 0) {
         return parse_ident(stream, "");
-      }
-    } else if (match$1 >= 11) {
-      if (match$1 >= 32) {
-        switch (match$1 - 32 | 0) {
-          case 0 : 
-              return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
+      } else {
+        switch (switcher) {
           case 2 : 
               return parse_string(pop(stream), "");
+          case 8 : 
+              return parse_list(pop(stream), /* [] */0);
+          case 9 : 
+              return /* ParseFail */Block.__(1, ["Unexpected close paren"]);
+          case 17 : 
+          case 18 : 
+          case 19 : 
+          case 20 : 
+          case 21 : 
+          case 22 : 
+          case 23 : 
+          case 24 : 
+          case 25 : 
+              return parse_num(stream, "");
           case 1 : 
           case 3 : 
           case 4 : 
           case 5 : 
           case 6 : 
           case 7 : 
+          case 10 : 
+          case 11 : 
+          case 12 : 
+          case 13 : 
+          case 14 : 
+          case 15 : 
+          case 16 : 
+          case 26 : 
               return parse_ident(stream, "");
-          case 8 : 
-              return parse_list(pop(stream), /* [] */0);
+          case 0 : 
+          case 27 : 
+              return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
           
         }
-      } else {
-        return parse_ident(stream, "");
       }
     } else if (match$1 >= 9) {
       return /* ParseFail */Block.__(1, ["Unexpected whitespace"]);
