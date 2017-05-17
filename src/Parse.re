@@ -137,7 +137,7 @@ and parse_no_leading_whitespace (stream: Stream.t) :parseResult =>
   switch (Stream.peek stream) {
   | Some '"' => parse_string (Stream.pop stream) ""
   | Some '(' => parse_list (Stream.pop stream) []
-  | Some '1'..'9' => parse_num stream ""
+  | Some '0'..'9' => parse_num stream ""
   | Some ';'
   | Some ' '
   | Some '\t'
