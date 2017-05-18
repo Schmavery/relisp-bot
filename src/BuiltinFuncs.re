@@ -552,7 +552,7 @@ module Builtins (Environment: EnvironmentT) => {
                 create_exception "Called 'car' on empty list",
                 state
               )
-            | [_] => (create_exception "Expected list in call to 'car'", state)
+            | [e] => (create_exception ("Expected list in call to 'car', got [" ^ string_of_ast (Ok e) ^ "] instead."), state)
             | lst => received_error expected::1 args::lst name::"car" ::state
             }
         );
@@ -574,6 +574,22 @@ module Builtins (Environment: EnvironmentT) => {
               )
             | [_] => (create_exception "Expected list in call to 'cdr'", state)
             | lst => received_error expected::1 args::lst name::"cdr" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "cons"
+        macro::false
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [el, {value: List lst}] => (
+                Ok (create_node (List [el, ...lst])),
+                state
+              )
+            | [_, _] => (create_exception "Expected list as second arg in call to 'cons'", state)
+            | lst => received_error expected::2 args::lst name::"cons" ::state
             }
         );
     let state =
