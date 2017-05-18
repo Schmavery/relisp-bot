@@ -252,6 +252,13 @@ function Builtins(Environment) {
                         ]]);
             }
             break;
+        case 1 : 
+        case 2 : 
+        case 3 : 
+            return /* Ok */Block.__(0, [/* tuple */[
+                        map,
+                        state
+                      ]]);
         case 5 : 
             return List.fold_left(function (acc, v) {
                         if (acc.tag) {
@@ -264,15 +271,8 @@ function Builtins(Environment) {
                             map,
                             state
                           ]]), match[0]);
-        case 4 : 
-        case 6 : 
-        case 7 : 
-            return /* Error */Block.__(1, ["Found non-literal in lambda body."]);
         default:
-          return /* Ok */Block.__(0, [/* tuple */[
-                      map,
-                      state
-                    ]]);
+          return /* Error */Block.__(1, ["Found non-literal in lambda body."]);
       }
     };
     var parse_lambda_args = function (_args, _acc) {
@@ -1010,7 +1010,8 @@ function Builtins(Environment) {
     var state$16 = add_native_lambda("car", /* false */0, function (args, _, state) {
           var exit = 0;
           if (args) {
-            var match = args[0][/* value */1];
+            var e = args[0];
+            var match = e[/* value */1];
             if (match.tag === 5) {
               var match$1 = match[0];
               if (match$1) {
@@ -1034,7 +1035,7 @@ function Builtins(Environment) {
               exit = 1;
             } else {
               return /* tuple */[
-                      Common.create_exception("Expected list in call to 'car'"),
+                      Common.create_exception("Expected list in call to 'car', got [" + (Common.string_of_ast(/* Ok */Block.__(0, [e])) + "] instead.")),
                       state
                     ];
             }
@@ -1085,7 +1086,44 @@ function Builtins(Environment) {
           }
           
         }, state$16);
-    var state$18 = add_native_lambda("DEBUG/print-scope", /* false */0, function (args, _, state) {
+    var state$18 = add_native_lambda("cons", /* false */0, function (args, _, state) {
+          var exit = 0;
+          if (args) {
+            var match = args[1];
+            if (match) {
+              var match$1 = match[0][/* value */1];
+              if (match$1.tag === 5) {
+                if (match[1]) {
+                  exit = 1;
+                } else {
+                  return /* tuple */[
+                          /* Ok */Block.__(0, [Common.create_node(/* List */Block.__(5, [/* :: */[
+                                        args[0],
+                                        match$1[0]
+                                      ]]))]),
+                          state
+                        ];
+                }
+              } else if (match[1]) {
+                exit = 1;
+              } else {
+                return /* tuple */[
+                        Common.create_exception("Expected list as second arg in call to 'cons'"),
+                        state
+                      ];
+              }
+            } else {
+              exit = 1;
+            }
+          } else {
+            exit = 1;
+          }
+          if (exit === 1) {
+            return received_error(2, args, "cons", state);
+          }
+          
+        }, state$17);
+    var state$19 = add_native_lambda("DEBUG/print-scope", /* false */0, function (args, _, state) {
           var exit = 0;
           if (args) {
             var match = args[0][/* value */1];
@@ -1109,8 +1147,8 @@ function Builtins(Environment) {
             return received_error(1, args, "DEBUG/print-scope", state);
           }
           
-        }, state$17);
-    var state$19 = add_native_lambda("DEBUG/print-state", /* false */0, function (args, _, state) {
+        }, state$18);
+    var state$20 = add_native_lambda("DEBUG/print-state", /* false */0, function (args, _, state) {
           if (args) {
             return received_error(0, args, "DEBUG/print-state", state);
           } else {
@@ -1120,7 +1158,7 @@ function Builtins(Environment) {
                     state
                   ];
           }
-        }, state$18);
+        }, state$19);
     return add_native_lambda_async("DEBUG/expand-macro", /* false */0, function (args, ctx, initial_state, cb) {
                 var exit = 0;
                 if (args) {
@@ -1204,7 +1242,7 @@ function Builtins(Environment) {
                   return Curry._1(cb, received_error(0, args, "DEBUG/expand-macro", initial_state));
                 }
                 
-              }, state$19);
+              }, state$20);
   };
   return /* module */[
           /* received_error */received_error,
@@ -2124,6 +2162,7 @@ function parse_no_leading_whitespace(stream) {
               return parse_list(pop(stream), /* [] */0);
           case 9 : 
               return /* ParseFail */Block.__(1, ["Unexpected close paren"]);
+          case 16 : 
           case 17 : 
           case 18 : 
           case 19 : 
@@ -2146,7 +2185,6 @@ function parse_no_leading_whitespace(stream) {
           case 13 : 
           case 14 : 
           case 15 : 
-          case 16 : 
           case 26 : 
               return parse_ident(stream, "");
           case 0 : 
