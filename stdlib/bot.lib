@@ -1,0 +1,5 @@
+(define ping
+  (lambda () "pong"))
+
+(define sayit
+  (lambda () "David's an idiot"))
