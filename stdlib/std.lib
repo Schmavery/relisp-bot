@@ -182,7 +182,7 @@
       (~(nil? (cdr rest)) (~(car (car rest)) ~data ~@(cdr (car rest))))
       (true (recur (~@(car rest) ~data) ~@(cdr rest))))))
 
-; "Takes a hashmap, a key and a value, and returns a hashmap with the (key value) pair added to it  ."
+; "Takes a map, a key and a value, and returns a map with the (key value) pair added to it  ."
 (define assoc
   (let (hm-dedupe (lambda (map)
     (foldl (lambda (acc k)
@@ -204,11 +204,11 @@
                                                   (car (cdr v))
                                                   acc)) '() m)))))))))
 
-; "Creates a hashmap.  Can be followed by alternating keys and values to initialize it."
-(define hashmap (lambda (... init)
+; "Creates a map.  Can be followed by alternating keys and values to initialize it."
+(define make-map (lambda (... init)
   (foldr (lambda (prevhm tup) (apply assoc (cons prevhm tup))) (lambda (... a) '()) init)))
 
-; "Takes a hashmap and an arbitrary number of keys, and returns a hashmap with the keys removed."
+; "Takes a map and an arbitrary number of keys, and returns a map with the keys removed."
 (define dissoc (lambda (hmap ... keys)
   (let (m (filter (lambda (v) (not (contain? identity (car v) keys))) (hmap)))
     (lambda (... args)

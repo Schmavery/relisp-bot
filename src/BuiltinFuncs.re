@@ -292,6 +292,8 @@ module Builtins (Environment: EnvironmentT) => {
               )
             }
         );
+
+    /** Quote-related logic */
     let state =
       add_native_lambda
         ::state
@@ -539,6 +541,8 @@ module Builtins (Environment: EnvironmentT) => {
               received_error expected::2 args::lst name::"equal?" ::state
             }
         );
+
+    /** List manipulation functions */
     let state =
       add_native_lambda
         ::state
@@ -552,7 +556,13 @@ module Builtins (Environment: EnvironmentT) => {
                 create_exception "Called 'car' on empty list",
                 state
               )
-            | [e] => (create_exception ("Expected list in call to 'car', got [" ^ string_of_ast (Ok e) ^ "] instead."), state)
+            | [e] => (
+                create_exception (
+                  "Expected list in call to 'car', got [" ^
+                  string_of_ast (Ok e) ^ "] instead."
+                ),
+                state
+              )
             | lst => received_error expected::1 args::lst name::"car" ::state
             }
         );
@@ -588,10 +598,15 @@ module Builtins (Environment: EnvironmentT) => {
                 Ok (create_node (List [el, ...lst])),
                 state
               )
-            | [_, _] => (create_exception "Expected list as second arg in call to 'cons'", state)
+            | [_, _] => (
+                create_exception "Expected list as second arg in call to 'cons'",
+                state
+              )
             | lst => received_error expected::2 args::lst name::"cons" ::state
             }
         );
+
+    /** Debug functions */
     let state =
       add_native_lambda
         ::state
@@ -630,7 +645,7 @@ module Builtins (Environment: EnvironmentT) => {
         "DEBUG/expand-macro"
         macro::false
         (
-          fun args ::ctx state::initial_state ::cb =>{
+          fun args ::ctx state::initial_state ::cb =>
             switch args {
             | [{value: List [first, ...args]}] =>
               Eval.eval
@@ -662,7 +677,7 @@ module Builtins (Environment: EnvironmentT) => {
                   name::"DEBUG/expand-macro"
                   state::initial_state
               )
-            }}
+            }
         );
     state
   };
