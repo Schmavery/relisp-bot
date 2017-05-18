@@ -1,13 +1,25 @@
+; "Equivalent to an empty list."
 (define nil '())
 
+; "Returns true if argument is nil."
 (define nil? (lambda (x) (= nil x)))
 
+; "Returns what is passed in."
 (define identity (lambda (x) x))
 
+; "Takes variadic arguments that are returned wrapped in a list."
 (define list (lambda (... args) args))
 
+; "Checks if the type of the first argument is equal to the string passed as a second arg."
+; (define type? (lambda (var type) (equal? (typeof var) type)))
+
+; "Takes a fn and an arr and applies the elements of the array to the function as arguments."
 (define apply (macro (fn arr) `(~fn ~@arr)))
 
+  ; "Takes a set of test/expr pairs. It evaluates each test one at a
+; time.  If a test returns logical true, cond evaluates and returns
+; the value of the corresponding expr and doesn't evaluate any of the
+; other tests or exprs."
 (define cond (macro (x ... rest)
   `(if ~(car x)
        ~(car (cdr x))
@@ -15,31 +27,42 @@
           ()
           (cond ~@rest)))))
 
+; "Evaluates arguments from left to right until it hits one that evaluates to false. If all of expressions evaluate to true, it will return true. Otherwise it will return false."
 (define and
   (macro (x ... args)
     (if (nil? args)
       x
       `(if ~x (and ~@args) false))))
 
+; "Evaluates arguments from left to right until it hits one that evaluates to true. If one of the expressions evaluate to true, it will return true. Otherwise it will return false."
 (define or
   (macro (x ... args)
     (if (nil? args)
       x
       `(if ~x true (or ~@args)))))
 
+; "Returns true if the passed-in list contains nil."
 (define has-nil?
   (lambda (arr)
   (if (nil? arr)
     false
     (or (nil? (car arr)) (recur (cdr arr))))))
 
-(define car'
-  (lambda (arrs)
+; "Takes a list of lists, and maps car onto it."
+(define car' (lambda (arrs)
   (if (nil? arrs)
     nil
     (cons
       (car (car arrs))
       (recur (cdr arrs))))))
+
+; "Takes a list of lists, and maps cdr onto it."
+(define cdr' (lambda (arrs)
+  (if (nil? arrs)
+    nil
+    (cons (cdr (car arrs)) (cdr' (cdr arrs)))
+  )
+))
 
 (define foldr (lambda (fn base lst)
   (if (nil? lst)
@@ -53,6 +76,7 @@
       (fn base (car lst))
       (cdr lst)))))
 
+; "Reverses the passed-in list"
 (define reverse
   (lambda (l) (foldl (lambda (acc v) (cons v acc)) nil l)))
 
@@ -67,14 +91,17 @@
     )
   ) '() arr)))
 
+; "Returns true if the argument is equal to 0."
 (define zero?
   (lambda (expr)
     (= 0 expr)))
 
+; "Returns the negated argument. Equivalent to (if expr false true)"
 (define not
   (lambda (expr)
     (if expr false true)))
 
+; "Returns the second element of the passed-in list. Equivalent to (car (cdr lst))"
 (define second
   (lambda (x)
     (car (cdr x))))
@@ -110,6 +137,84 @@
 (define range (lambda (fst ... args)
   (if (nil? args)
     (range 0 fst)
-    (if (equal? fst (car args))
+    (if (= fst (car args))
       nil
       (cons fst (recur (+ 1 fst) (car args)))))))
+
+(define even-len? (lambda (coll)
+  (if (nil? coll)
+    true
+    (not (recur (cdr coll))))))
+
+(define every-other-odd
+  (lambda (coll)
+    (if (nil? coll)
+      ()
+      (if (even-len? coll)
+        (recur (cdr coll))
+        (cons (car coll) (recur (cdr coll)))))))
+
+(define every-other-even
+  (lambda (coll)
+    (if (nil? coll)
+      ()
+      (if (even-len? coll)
+        (cons (car coll) (recur (cdr coll)))
+        (recur (cdr coll))))))
+
+(define let
+  (macro (vars body)
+    `((lambda ~(every-other-even vars) ~body) ~@(every-other-odd vars))))
+
+; "Usage: (->> x ... funcs)
+; Threads the expr through the lambdas. Inserts x as the last item in the first form, making a list of it if it is not a list already. If there are more forms, inserts the first form as the last item in second form, etc. (from clojuredocs)"
+(define ->> (macro (data ... rest)
+  `(cond
+      (~(nil? rest) ~data)
+      (~(nil? (cdr rest)) (~@(car rest) ~data))
+      (true (recur (~@(car rest) ~data) ~@(cdr rest))))))
+
+; "Usage: (-> x ... forms)
+; Threads the expr through the forms. Inserts x as the second item in the first form, making a list of it if it is not a list already. If there are more forms, inserts the first form as the second item in second form, etc. (from clojuredocs)"
+(define -> (macro (data ... rest)
+  `(cond
+      (~(nil? rest) ~data)
+      (~(nil? (cdr rest)) (~(car (car rest)) ~data ~@(cdr (car rest))))
+      (true (recur (~@(car rest) ~data) ~@(cdr rest))))))
+
+; "Takes a hashmap, a key and a value, and returns a hashmap with the (key value) pair added to it  ."
+(define assoc
+  (let (hm-dedupe (lambda (map)
+    (foldl (lambda (acc k)
+      (if (contain? (lambda (e) (car e)) (car k) acc)
+        acc
+        (cons k acc)
+      ) )
+      '()
+      map
+    )
+  ))
+  (lambda (hmap key val)
+          (let (m (hm-dedupe (cons (list key val) (hmap))))
+              (lambda (... args)
+                (let (l (len args))
+                  (cond ((= 0 l) m)
+                        ((= 1 l) (foldr (lambda (acc v)
+                                                (if (= (car v) (car args))
+                                                  (car (cdr v))
+                                                  acc)) '() m)))))))))
+
+; "Creates a hashmap.  Can be followed by alternating keys and values to initialize it."
+(define hashmap (lambda (... init)
+  (foldr (lambda (prevhm tup) (apply assoc (cons prevhm tup))) (lambda (... a) '()) init)))
+
+; "Takes a hashmap and an arbitrary number of keys, and returns a hashmap with the keys removed."
+(define dissoc (lambda (hmap ... keys)
+  (let (m (filter (lambda (v) (not (contain? identity (car v) keys))) (hmap)))
+    (lambda (... args)
+          (let (l (len args))
+            (cond ((= 0 l) m)
+                  ((= 1 l) (foldr (lambda (acc v)
+                                          (if (= (car v) (car args))
+                                            (car (cdr v))
+                                            acc)) '() m))))))))
