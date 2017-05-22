@@ -1,7 +1,3 @@
-open Common;
-
-open Evaluate;
-
 module Environment: BuiltinFuncs.EnvironmentT = {
   type errorT;
   external readFile :
@@ -16,42 +12,43 @@ module Environment: BuiltinFuncs.EnvironmentT = {
       (fun _ str => cb (Js.Undefined.to_opt str));
 };
 
-module Builtins = BuiltinFuncs.Builtins Environment;
+module Readline = {
+  type pipeT;
+  type interfaceDefT;
+  type interfaceT;
+  external createInterfaceDef : input::pipeT => output::pipeT => interfaceDefT =
+    "" [@@bs.obj];
+  external createInterface : interfaceDefT => interfaceT =
+    "createInterface" [@@bs.module "readline"];
+  external question : interfaceT => string => (string => unit) => unit =
+    "question" [@@bs.send];
+  external stdin : pipeT = "process.stdin" [@@bs.val];
+  external stdout : pipeT = "process.stdout" [@@bs.val];
+};
 
-type rlPipeT;
+let rlDef =
+  Readline.createInterfaceDef input::Readline.stdin output::Readline.stdout;
 
-type rlInterfaceDefT;
-
-type rlInterfaceT;
-
-external createRLInterfaceDef :
-  input::rlPipeT => output::rlPipeT => rlInterfaceDefT =
-  "" [@@bs.obj];
-
-external createRLInterface : rlInterfaceDefT => rlInterfaceT =
-  "createInterface" [@@bs.module "readline"];
-
-external rlQuestion : rlInterfaceT => string => (string => unit) => unit =
-  "question" [@@bs.send];
-
-external stdin : rlPipeT = "process.stdin" [@@bs.val];
-
-external stdout : rlPipeT = "process.stdout" [@@bs.val];
-
-let rlDef = createRLInterfaceDef input::stdin output::stdout;
-
-let rl = createRLInterface rlDef;
+let rl = Readline.createInterface rlDef;
 
 Random.self_init ();
 
-let process_input (state: Eval.t) ::cb in_str :unit =>
-  switch (Parse.parse_single in_str) {
+module AST = Common.AST Common.BasicEvalState;
+
+module Eval = Evaluate.Eval AST;
+
+module Parser = Parse.Parser Eval.AST;
+
+module Builtins = BuiltinFuncs.Builtins Environment Eval;
+
+let process_input (state: Eval.evalStateT) ::cb in_str :unit =>
+  switch (Parser.parse_single in_str) {
   | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) ::state ::cb
   | Error _ as e => cb (e, state)
   };
 
 let rec prompt state =>
-  rlQuestion
+  Readline.question
     rl
     "> "
     (
@@ -59,7 +56,7 @@ let rec prompt state =>
         state
         cb::(
           fun (result, state) => {
-            print_endline (string_of_ast result);
+            print_endline (Eval.AST.to_string result);
             prompt state
           }
         )

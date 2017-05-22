@@ -1,48 +1,46 @@
 open Common;
 
 module type EvalT = {
-  type t = evaluationStateT;
-  let empty: t;
-  let empty_node: astNodeT;
-  let trueNode: astNodeT;
-  let falseNode: astNodeT;
+  module AST: Common.AST_Type;
+  type evalStateT = AST.evalStateT;
+  type ctxT = AST.ctxT;
+  type astNodeT = AST.astNodeT;
+  let empty: evalStateT;
   let to_bool_node: bool => astNodeT;
   let is_macro: astNodeT => bool;
-  let create_initial_context: t => ctxT;
-  let define_native_symbol: t => string => astNodeT => t;
-  let define_user_symbol: t => string => astNodeT => t;
-  let resolve_ident: string => ctxT => t => option astNodeT;
-  let is_reserved_symbol: t => string => bool;
-  let add_to_uuid_map: t => astNodeT => t;
+  let create_initial_context: evalStateT => ctxT;
+  let define_native_symbol: evalStateT => string => astNodeT => evalStateT;
+  let define_user_symbol: evalStateT => string => astNodeT => evalStateT;
+  let resolve_ident: string => ctxT => evalStateT => option astNodeT;
+  let is_reserved_symbol: evalStateT => string => bool;
+  let add_to_uuid_map: evalStateT => astNodeT => evalStateT;
   let eval:
     astNodeT =>
     ctx::ctxT =>
-    state::t =>
-    cb::((result astNodeT astNodeT, t) => unit) =>
+    state::evalStateT =>
+    cb::((result astNodeT astNodeT, evalStateT) => unit) =>
     unit;
   let eval_lambda:
     astNodeT =>
     args::list astNodeT =>
     func_name::string =>
     ctx::ctxT =>
-    state::t =>
-    cb::((result astNodeT astNodeT, t) => unit) =>
+    state::evalStateT =>
+    cb::((result astNodeT astNodeT, evalStateT) => unit) =>
     unit;
 };
 
-module Eval: EvalT = {
-  type t = evaluationStateT;
-  let empty: t = {
-    userTable: StringMap.empty,
-    uuidToNodeMap: StringMap.empty,
-    symbolTable: StringMap.empty
-  };
-  let empty_node = {uuid: gen_uuid (), value: List []};
-  let trueNode = {uuid: gen_uuid (), value: Bool true};
-  let falseNode = {uuid: gen_uuid (), value: Bool false};
-  let to_bool_node b => if b {trueNode} else {falseNode};
+module Eval (AST: AST_Type) :EvalT => {
+  module AST = AST;
+  module EvalState = AST.EvalState;
+  module Constants = Common.Constants AST;
+  type evalStateT = AST.evalStateT;
+  type ctxT = AST.ctxT;
+  type astNodeT = AST.astNodeT;
+  let empty = EvalState.empty;
+  let to_bool_node b => if b {Constants.true_node} else {Constants.false_node};
   let max_stack = 512;
-  let is_macro func :bool =>
+  let is_macro (func: AST.astNodeT) :bool =>
     switch func {
     | {value: NativeFunc f} => f.is_macro
     | {value: Func f} => f.is_macro
@@ -50,52 +48,44 @@ module Eval: EvalT = {
     };
 
   /***/
-  let create_initial_context state => {
-    argsUuidMap: StringMap.empty,
-    argsTable: state.userTable,
-    depth: 0
+  let create_initial_context (state: evalStateT) => {
+    AST.argsUuidMap: StringMap.empty,
+    AST.argsTable: EvalState.usertable state,
+    AST.depth: 0
   };
 
   /***/
-  let add_to_uuid_map (state: t) (node: astNodeT) :t => {
-    ...state,
-    uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
-  };
+  let add_to_uuid_map state node =>
+    EvalState.add_to_uuidmap node.AST.uuid node state;
 
   /***/
   let is_reserved_symbol state ident_name =>
-    stringmap_get ident_name state.symbolTable == None;
-  let define_native_symbol (state: t) (ident_name: string) (node: astNodeT) :t => {
-    ...state,
-    symbolTable: StringMap.add ident_name node.uuid state.symbolTable,
-    uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
-  };
+    StringMapHelper.get ident_name (EvalState.symboltable state) == None;
 
   /***/
-  let define_user_symbol (state: t) (ident_name: string) (node: astNodeT) :t => {
-    ...state,
-    userTable: StringMap.add ident_name node.uuid state.userTable,
-    uuidToNodeMap: StringMap.add node.uuid node state.uuidToNodeMap
-  };
+  let define_native_symbol state (ident_name: string) (node: astNodeT) =>
+    state |> EvalState.add_to_symboltable ident_name node.uuid |>
+    EvalState.add_to_uuidmap node.uuid node;
 
   /***/
-  let resolve_ident
-      (ident_name: string)
-      (ctx: ctxT)
-      (state: t)
-      :option astNodeT => {
+  let define_user_symbol state (ident_name: string) (node: astNodeT) =>
+    state |> EvalState.add_to_usertable ident_name node.uuid |>
+    EvalState.add_to_uuidmap node.uuid node;
+
+  /***/
+  let resolve_ident (ident_name: string) (ctx: ctxT) state :option astNodeT => {
     let uuid =
-      switch (stringmap_get ident_name state.symbolTable) {
+      switch (StringMapHelper.get ident_name (EvalState.symboltable state)) {
       | Some _ as uuid => uuid
-      | None => stringmap_get ident_name ctx.argsTable
+      | None => StringMapHelper.get ident_name ctx.argsTable
       };
     switch uuid {
     | None => None
     | Some x =>
-      switch (stringmap_get x state.uuidToNodeMap) {
+      switch (StringMapHelper.get x (EvalState.uuidmap state)) {
       | Some x => Some x
       | None =>
-        switch (stringmap_get x ctx.argsUuidMap) {
+        switch (StringMapHelper.get x ctx.argsUuidMap) {
         | Some x => Some x
         | None =>
           failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
@@ -114,7 +104,7 @@ module Eval: EvalT = {
     switch (func_args, passed_args, vararg) {
     | ([], [], None) => Ok map
     | ([], rest, Some vararg) =>
-      Ok (StringMap.add vararg {uuid: gen_uuid (), value: List rest} map)
+      Ok (StringMap.add vararg (AST.create_node (List rest)) map)
     | ([ident, ...tl1], [value, ...tl2], _) =>
       create_lambda_arg_map vararg tl1 tl2 (StringMap.add ident value map)
     | ([], rest, None) =>
@@ -146,7 +136,7 @@ module Eval: EvalT = {
   let rec eval
           ({value} as original_node: astNodeT)
           ctx::(ctx: ctxT)
-          state::(state: t)
+          ::state
           ::cb
           :unit =>
     switch value {
@@ -154,7 +144,10 @@ module Eval: EvalT = {
       switch (resolve_ident ident ctx state) {
       | Some resolved => cb (Ok resolved, state)
       | None =>
-        cb (create_exception ("Undeclared identifier [" ^ ident ^ "]."), state)
+        cb (
+          AST.create_exception ("Undeclared identifier [" ^ ident ^ "]."),
+          state
+        )
       }
     | List lst =>
       switch lst {
@@ -197,9 +190,9 @@ module Eval: EvalT = {
                 eval_lambda func ::args ::ctx func_name::name ::state ::cb
               | Error e => cb (Error e, state)
               | Ok x =>
-                let node_str = string_of_ast (Ok x);
+                let node_str = AST.to_string (Ok x);
                 cb (
-                  create_exception (
+                  AST.create_exception (
                     "Trying to call something that isn't a function. [" ^
                     node_str ^ "]"
                   ),
@@ -219,7 +212,7 @@ module Eval: EvalT = {
       ::cb =>
     if (ctx.depth > max_stack) {
       cb (
-        create_exception ("Stack overflow > " ^ string_of_int max_stack),
+        AST.create_exception ("Stack overflow > " ^ string_of_int max_stack),
         state
       )
     } else {
@@ -246,16 +239,24 @@ module Eval: EvalT = {
                   create_lambda_arg_map
                     vararg args passed_args StringMap.empty;
                 switch arg_to_node_map {
-                | Error e => cb (create_exception e, state)
+                | Error e => cb (AST.create_exception e, state)
                 | Ok map =>
                   let argsUuidMap =
                     StringMap.fold
-                      (fun _k value acc => StringMap.add value.uuid value acc)
+                      (
+                        fun _k value acc =>
+                          StringMap.add value.AST.uuid value acc
+                      )
                       map
                       ctx.argsUuidMap;
-                  let arg_map = StringMap.map (fun value => value.uuid) map;
-                  let argsTable = stringmap_union arg_map scope;
-                  let ctx = {depth: ctx.depth + 1, argsUuidMap, argsTable};
+                  let arg_map =
+                    StringMap.map (fun value => value.AST.uuid) map;
+                  let argsTable = StringMapHelper.union arg_map scope;
+                  let ctx = {
+                    AST.depth: ctx.depth + 1,
+                    AST.argsUuidMap: argsUuidMap,
+                    AST.argsTable: argsTable
+                  };
                   eval func ::ctx ::state ::cb
                 }
               | (Error _, _) as e => cb e
@@ -267,10 +268,10 @@ module Eval: EvalT = {
   and eval_args
       (func: astNodeT)
       (args: list astNodeT)
-      (ctx: ctxT)
-      (state: t)
+      ctx
+      state
       (acc: list astNodeT)
-      cb::(return: (result (list astNodeT) astNodeT, t) => unit)
+      cb::return
       :unit =>
     if (is_macro func) {
       return (Ok args, state)

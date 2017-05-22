@@ -1,15 +1,6 @@
 open Common;
 
-open Evaluate;
-
 module Environment: BuiltinFuncs.EnvironmentT = {
-  /* var xhr = new XMLHttpRequest(); */
-  /*     xhr.open('GET', path, false); */
-  /*     xhr.send(null); */
-  /*     var contents = null */
-  /*     if (xhr.readyState === 4 && xhr.status === 200) { */
-  /*       contents = xhr.responseText */
-  /*     } */
   module XHR = {
     type t;
     external create : unit => t = "XMLHttpRequest" [@@bs.new];
@@ -42,8 +33,6 @@ module Environment: BuiltinFuncs.EnvironmentT = {
   };
 };
 
-module Builtins = BuiltinFuncs.Builtins Environment;
-
 external log : 'a => unit = "console.log" [@@bs.val];
 
 external getElementById : string => Js.t 'a =
@@ -73,8 +62,16 @@ let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 
 Random.self_init ();
 
-let process_input (in_str: string) (state: Eval.t) ::cb :unit =>
-  switch (Parse.parse_single in_str) {
+module AST = Common.AST Common.BasicEvalState;
+
+module Eval = Evaluate.Eval AST;
+
+module Parser = Parse.Parser Eval.AST;
+
+module Builtins = BuiltinFuncs.Builtins Environment Eval;
+
+let process_input (in_str: string) (state: Eval.evalStateT) ::cb :unit =>
+  switch (Parser.parse_single in_str) {
   | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) ::state ::cb
   | Error _ as e => cb (e, state)
   };
@@ -127,7 +124,7 @@ setOnKeyDown
               state := new_state;
               setValue input_element "";
               add_console_element ("> " ^ in_str);
-              string_of_ast res |> add_console_element
+              Eval.AST.to_string res |> add_console_element
             }
           );
         Js.false_
