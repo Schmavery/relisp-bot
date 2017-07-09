@@ -58,6 +58,18 @@ external createElement : string => Js.t 'a =
 
 external setInnerHtml : Js.t 'a => string => unit = "innerHTML" [@@bs.set];
 
+type styleT;
+
+external getStyle : Js.t 'a => styleT = "style" [@@bs.get];
+
+external setFontFamily : styleT => string => unit = "fontFamily" [@@bs.set];
+
+type regexpT;
+
+external regexp : string => string => regexpT = "RegExp" [@@bs.new];
+
+external replace : string => regexpT => string => string = "" [@@bs.send];
+
 let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 
 Random.self_init ();
@@ -78,8 +90,16 @@ let input_element = getElementById "input";
 
 let console_element = getElementById "console";
 
+let setMonospaced el => setFontFamily (getStyle el) "monospace";
+
+setMonospaced input_element;
+
+setMonospaced console_element;
+
 let add_console_element inner_text => {
   let new_node = createElement "div";
+  let inner_text = replace inner_text (regexp "\n" "g") "<br>";
+  let inner_text = replace inner_text (regexp " " "g") "&nbsp;";
   setInnerHtml new_node inner_text;
   appendChild console_element new_node;
   scroll_bottom console_element
