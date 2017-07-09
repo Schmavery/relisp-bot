@@ -62,4 +62,28 @@ let rec prompt state =>
         )
     );
 
-prompt (Builtins.add_builtins Eval.empty);
+let state = Builtins.add_builtins Eval.empty;
+
+switch (Parser.parse_single "(load \"std\")") {
+| Ok e =>
+  Eval.eval
+    e
+    ctx::(Eval.create_initial_context state)
+    ::state
+    cb::(
+      fun (res, s) =>
+        switch res {
+        | Ok _ =>
+          print_endline "Stdlib autoloaded successfully.";
+          prompt s
+        | Error _=>
+          print_endline (Eval.AST.to_string res);
+          print_endline "Error evaluating stdlib, continuing...";
+          prompt state
+        }
+    )
+| Error _ as e =>
+  print_endline (Eval.AST.to_string e);
+  print_endline "Error parsing stdlib, continuing...";
+  prompt state
+};
