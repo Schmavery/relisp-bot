@@ -18,7 +18,7 @@ module type EvalT = {
     astNodeT =>
     ctx::ctxT =>
     state::evalStateT =>
-    cb::((result astNodeT astNodeT, evalStateT) => unit) =>
+    cb::((result astNodeT AST.exceptionT, evalStateT) => unit) =>
     unit;
   let eval_lambda:
     astNodeT =>
@@ -26,7 +26,7 @@ module type EvalT = {
     func_name::string =>
     ctx::ctxT =>
     state::evalStateT =>
-    cb::((result astNodeT astNodeT, evalStateT) => unit) =>
+    cb::((result astNodeT AST.exceptionT, evalStateT) => unit) =>
     unit;
 };
 
@@ -181,14 +181,15 @@ module Eval (AST: AST_Type) :EvalT => {
                       fun res =>
                         switch res {
                         | (Ok x, state) => eval x ::ctx ::state ::cb
-                        | (Error _, _) as e => cb e
+                        | (Error (lst, ex), state) => cb (Error ([name, ...lst], ex), state)
                         }
                     }
                   )
               | Ok ({value: NativeFunc {is_macro: false}} as func)
               | Ok ({value: Func {is_macro: false}} as func) =>
                 eval_lambda func ::args ::ctx func_name::name ::state ::cb
-              | Error e => cb (Error e, state)
+              /* | Error e => cb (Error e, state) */
+              | Error (lst, ex) => cb (Error ([name, ...lst], ex), state)
               | Ok x =>
                 let node_str = AST.to_string (Ok x);
                 cb (
@@ -230,7 +231,7 @@ module Eval (AST: AST_Type) :EvalT => {
               | (Ok args, state) =>
                 native.func
                   args ctx::{...ctx, depth: ctx.depth + 1} ::state ::cb
-              | (Error _, _) as e => cb e
+              | (Error (trace, ex), s) => cb (Error ([func_name, ...trace], ex), s)
               }
             | Func {func, args, scope, vararg} =>
               switch maybe_args {
@@ -259,7 +260,7 @@ module Eval (AST: AST_Type) :EvalT => {
                   };
                   eval func ::ctx ::state ::cb
                 }
-              | (Error _, _) as e => cb e
+              | (Error (trace, ex), s) => cb (Error ([func_name, ...trace], ex), s)
               }
             | _ => assert false
             }

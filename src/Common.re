@@ -75,7 +75,11 @@ module BasicEvalState: EvalStateT = {
 module type AST_Type = {
   module EvalState: EvalStateT;
   type evalStateT = EvalState.t astNodeT
-  and astNodeT = {uuid: uuidT, value: valueT}
+  and exceptionT = (list string, astNodeT)
+  and astNodeT = {
+    uuid: uuidT,
+    value: valueT
+  }
   and funcT = {
     func: astNodeT,
     args: list string,
@@ -87,9 +91,12 @@ module type AST_Type = {
     list astNodeT =>
     ctx::ctxT =>
     state::evalStateT =>
-    cb::((result astNodeT astNodeT, evalStateT) => unit) =>
+    cb::((result astNodeT exceptionT, evalStateT) => unit) =>
     unit
-  and nativeFuncRecT = {func: nativeFuncT, is_macro: bool}
+  and nativeFuncRecT = {
+    func: nativeFuncT,
+    is_macro: bool
+  }
   and ctxT = {
     argsUuidMap: StringMap.t astNodeT,
     argsTable: StringMap.t uuidT,
@@ -106,13 +113,17 @@ module type AST_Type = {
     | NativeFunc nativeFuncRecT;
   let create_node: valueT => astNodeT;
   let gen_uuid: unit => uuidT;
-  let create_exception: string => result 'a astNodeT;
-  let to_string: result astNodeT astNodeT => string;
+  let create_exception: string => result 'a exceptionT;
+  let to_string: result astNodeT exceptionT => string;
 };
 
 module AST (EvalState: EvalStateT) :AST_Type => {
   module EvalState = EvalState;
-  type astNodeT = {uuid: uuidT, value: valueT}
+  type astNodeT = {
+    uuid: uuidT,
+    value: valueT
+  }
+  and exceptionT = (list string, astNodeT)
   and funcT = {
     func: astNodeT,
     args: list string,
@@ -124,9 +135,12 @@ module AST (EvalState: EvalStateT) :AST_Type => {
     list astNodeT =>
     ctx::ctxT =>
     state::evalStateT =>
-    cb::((result astNodeT astNodeT, evalStateT) => unit) =>
+    cb::((result astNodeT exceptionT, evalStateT) => unit) =>
     unit
-  and nativeFuncRecT = {func: nativeFuncT, is_macro: bool}
+  and nativeFuncRecT = {
+    func: nativeFuncT,
+    is_macro: bool
+  }
   and ctxT = {
     argsUuidMap: StringMap.t astNodeT,
     argsTable: StringMap.t uuidT,
@@ -149,24 +163,28 @@ module AST (EvalState: EvalStateT) :AST_Type => {
     "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
   };
   let create_node value => {uuid: gen_uuid (), value};
-  let create_exception text => Error (create_node (Str text));
-  let rec to_string (ast: result astNodeT astNodeT) :string => {
-    let string_of_func (f: funcT) => {
-      let title =
-        if f.is_macro {
-          "Macro"
-        } else {
-          "Function"
-        };
-      let arg_list =
-        switch f.vararg {
-        | Some vararg_name => f.args @ ["... " ^ vararg_name]
-        | None => f.args
-        };
-      let args = String.concat ", " arg_list;
-      let body = to_string (Ok f.func);
-      "[" ^ title ^ ": " ^ args ^ " => " ^ body ^ "]"
-    };
+  let create_exception text => Error ([], create_node (Str text));
+  let rec string_of_func (f: funcT) => {
+    let title =
+      if f.is_macro {
+        "Macro"
+      } else {
+        "Function"
+      };
+    let arg_list =
+      switch f.vararg {
+      | Some vararg_name => f.args @ ["... " ^ vararg_name]
+      | None => f.args
+      };
+    let args = String.concat ", " arg_list;
+    let body = to_string (Ok f.func);
+    "[" ^ title ^ ": " ^ args ^ " => " ^ body ^ "]"
+  }
+  and string_of_exception (lst: list string, node: astNodeT) =>
+    "[Exception of " ^
+    to_string (Ok node) ^
+    "]\nTrace: " ^ String.concat "\n       " (List.rev lst)
+  and to_string (ast: result astNodeT exceptionT) :string =>
     switch ast {
     | Ok value =>
       switch value.value {
@@ -183,9 +201,8 @@ module AST (EvalState: EvalStateT) :AST_Type => {
       | NativeFunc {is_macro: false} => "[Native Function]"
       | NativeFunc {is_macro: true} => "[Native Macro]"
       }
-    | Error ex => "[Exception of " ^ to_string (Ok ex) ^ "]"
-    }
-  };
+    | Error ex => string_of_exception ex
+    };
 };
 
 module Constants (AST: AST_Type) => {

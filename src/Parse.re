@@ -160,7 +160,7 @@ module Parser (AST: Common.AST_Type) => {
   let rec parse_multi
           (stream: Stream.t)
           (acc: list AST.astNodeT)
-          :Common.result (list AST.astNodeT) AST.astNodeT =>
+          :Common.result (list AST.astNodeT) AST.exceptionT =>
     switch (Stream.peek stream) {
     | Some _ =>
       switch (parse stream) {
@@ -170,14 +170,16 @@ module Parser (AST: Common.AST_Type) => {
       }
     | None => Ok (List.rev acc)
     };
-  let parse_multi (s: string) :Common.result (list AST.astNodeT) AST.astNodeT =>
+  let parse_multi
+      (s: string)
+      :Common.result (list AST.astNodeT) AST.exceptionT =>
     parse_multi (Stream.create s) [];
   let rec trim_comments (stream: Stream.t) =>
     switch (Stream.peek stream) {
     | Some ';' => trim_comments (pop_newline (Stream.pop stream))
     | _ => stream
     };
-  let parse_single s :Common.result AST.astNodeT AST.astNodeT => {
+  let parse_single s :Common.result AST.astNodeT AST.exceptionT => {
     let stream = Stream.create s;
     switch (parse stream) {
     | ParseOk (s, node) =>

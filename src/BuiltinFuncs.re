@@ -29,7 +29,12 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
           ctx::(ctx: Eval.ctxT)
           state::(state: Eval.evalStateT)
           cb::(
-            cb: (result Eval.astNodeT Eval.astNodeT, Eval.evalStateT) => unit
+            cb:
+              (
+                result AST.astNodeT AST.exceptionT,
+                Eval.evalStateT
+              ) =>
+              unit
           ) =>
         func args ::ctx ::state |> cb;
       let node = AST.create_node (NativeFunc {func: asyncf, is_macro});
@@ -189,7 +194,7 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
         (
           fun args ::ctx ::state =>
             switch args {
-            | [a] => (Error a, state)
+            | [a] => (Error ([], a), state)
             | lst => received_error expected::2 args::lst name::"throw" ::state
             }
         );
@@ -208,7 +213,7 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
                 ::state
                 cb::(
                   fun
-                  | (Error ex, state) =>
+                  | (Error (_trace, ex), state) =>
                     Eval.eval
                       lambda
                       ::ctx
@@ -332,7 +337,10 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
             ::state
             cb::(
               return:
-                (result (list Eval.astNodeT) Eval.astNodeT, Eval.evalStateT) =>
+                (
+                  result (list AST.astNodeT) AST.exceptionT,
+                  Eval.evalStateT
+                ) =>
                 unit
             )
             :unit =>
@@ -348,7 +356,7 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
             cb::(
               fun (res, state) =>
                 switch res {
-                | Error e => return (Error e, state)
+                | Error _ as e => return (e, state)
                 | Ok {value: List lst} =>
                   traverseH tl (acc @ lst) ::ctx ::state cb::return
                 | Ok _ =>
@@ -378,7 +386,12 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
         ::ctx
         state::(state: Eval.evalStateT)
         cb::(
-          return: (result Eval.astNodeT Eval.astNodeT, Eval.evalStateT) => unit
+          return:
+            (
+              result AST.astNodeT AST.exceptionT,
+              Eval.evalStateT
+            ) =>
+            unit
         )
         :unit =>
       switch node {
