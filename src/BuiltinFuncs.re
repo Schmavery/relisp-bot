@@ -4,10 +4,11 @@ module type EnvironmentT = {
   let load_lib: string => cb::(option string => unit) => unit;
 };
 
-module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
-  module AST = Eval.AST;
-  module Constants = Common.Constants AST;
-  module Parser = Parse.Parser AST;
+module Builtins (Environment: EnvironmentT) => {
+  module Eval = Evaluate.Eval;
+  module AST = Common.AST;
+  module Constants = Constants;
+  module Parser = Parse.Parser;
   let received_error ::expected ::args ::name ::state => (
     AST.create_exception (
       "Received " ^
@@ -22,17 +23,17 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
         (name: string)
         macro::(is_macro: bool)
         func
-        state::(state: Eval.evalStateT)
-        :Eval.evalStateT => {
+        state::(state: AST.evalStateT)
+        :AST.evalStateT => {
       let asyncf
-          (args: list Eval.astNodeT)
-          ctx::(ctx: Eval.ctxT)
-          state::(state: Eval.evalStateT)
+          (args: list AST.astNodeT)
+          ctx::(ctx: AST.ctxT)
+          state::(state: AST.evalStateT)
           cb::(
             cb:
               (
                 result AST.astNodeT AST.exceptionT,
-                Eval.evalStateT
+                AST.evalStateT
               ) =>
               unit
           ) =>
@@ -44,8 +45,8 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
         (name: string)
         macro::(is_macro: bool)
         (func: AST.nativeFuncT)
-        state::(state: Eval.evalStateT)
-        :Eval.evalStateT => {
+        state::(state: AST.evalStateT)
+        :AST.evalStateT => {
       let node = AST.create_node (NativeFunc {func, is_macro});
       Eval.define_native_symbol state name node
     };
@@ -53,8 +54,8 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
     let do_operation
         (op: float => float => float)
         (op_name: string)
-        (state: Eval.evalStateT)
-        :Eval.evalStateT =>
+        (state: AST.evalStateT)
+        :AST.evalStateT =>
       add_native_lambda
         op_name
         ::state
@@ -99,12 +100,12 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
     let state = do_operation (/.) "/" state;
     let state = do_operation ( *. ) "*" state;
     let rec create_lambda_scope
-            (node: Eval.astNodeT)
+            (node: AST.astNodeT)
             (map: StringMap.t uuidT)
             (arg_names: list string)
-            (ctx: Eval.ctxT)
-            (state: Eval.evalStateT)
-            :result (StringMap.t uuidT, Eval.evalStateT) string =>
+            (ctx: AST.ctxT)
+            (state: AST.evalStateT)
+            :result (StringMap.t uuidT, AST.evalStateT) string =>
       switch node {
       | {value: Ident i} =>
         switch (Eval.resolve_ident i ctx state) {
@@ -134,7 +135,7 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
       | _ => Error "Found non-literal in lambda body."
       };
     let rec parse_lambda_args
-            (args: list Eval.astNodeT)
+            (args: list AST.astNodeT)
             (acc: list string)
             :result (list string, option string) string =>
       switch args {
@@ -331,15 +332,15 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
             }
         );
     let rec traverseH
-            (lst: list Eval.astNodeT)
-            (acc: list Eval.astNodeT)
+            (lst: list AST.astNodeT)
+            (acc: list AST.astNodeT)
             ::ctx
             ::state
             cb::(
               return:
                 (
                   result (list AST.astNodeT) AST.exceptionT,
-                  Eval.evalStateT
+                  AST.evalStateT
                 ) =>
                 unit
             )
@@ -382,14 +383,14 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
         }
       }
     and traverse
-        (node: Eval.astNodeT)
+        (node: AST.astNodeT)
         ::ctx
-        state::(state: Eval.evalStateT)
+        state::(state: AST.evalStateT)
         cb::(
           return:
             (
               result AST.astNodeT AST.exceptionT,
-              Eval.evalStateT
+              AST.evalStateT
             ) =>
             unit
         )
@@ -460,9 +461,9 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
             }
         );
     let rec eval_list
-            (lst: list Eval.astNodeT)
-            (state: Eval.evalStateT)
-            (ctx: Eval.ctxT)
+            (lst: list AST.astNodeT)
+            (state: AST.evalStateT)
+            (ctx: AST.ctxT)
             cb::return =>
       switch lst {
       | [] => return (Ok state)
@@ -663,7 +664,7 @@ module Builtins (Environment: EnvironmentT) (Eval: Evaluate.EvalT) => {
           fun args ::ctx ::state =>
             switch args {
             | [] =>
-              print_endline (AST.EvalState.to_string state);
+              print_endline (Common.EvalState.to_string state);
               (Ok Constants.empty_node, state)
             | lst =>
               received_error

@@ -1,10 +1,10 @@
 open Common;
 
 module type EvalT = {
-  module AST: Common.AST_Type;
-  type evalStateT = AST.evalStateT;
-  type ctxT = AST.ctxT;
-  type astNodeT = AST.astNodeT;
+  /* type evalStateT = AST.evalStateT; */
+  /* type ctxT = AST.ctxT; */
+  /* type astNodeT = AST.astNodeT; */
+  open Common.AST;
   let empty: evalStateT;
   let to_bool_node: bool => astNodeT;
   let is_macro: astNodeT => bool;
@@ -30,10 +30,10 @@ module type EvalT = {
     unit;
 };
 
-module Eval (AST: AST_Type) :EvalT => {
-  module AST = AST;
-  module EvalState = AST.EvalState;
-  module Constants = Common.Constants AST;
+module Eval :EvalT = {
+  module AST = Common.AST;
+  module EvalState = Common.EvalState;
+  module Constants = Constants;
   type evalStateT = AST.evalStateT;
   type ctxT = AST.ctxT;
   type astNodeT = AST.astNodeT;

@@ -25,10 +25,10 @@ module Stream = {
 
 let append_char (s: string) (c: char) :string => s ^ String.make 1 c;
 
-module Parser (AST: Common.AST_Type) => {
-  module Constants = Common.Constants AST;
+module Parser = {
+  open Common.AST;
   type parseResult =
-    | ParseOk (Stream.t, AST.astNodeT)
+    | ParseOk (Stream.t, astNodeT)
     | ParseFail string
     | UnexpectedEnd;
 
@@ -47,7 +47,7 @@ module Parser (AST: Common.AST_Type) => {
         ParseFail ("Invalid escape sequence \\" ^ append_char "" c ^ ".")
       | None => ParseFail "Unterminated string."
       }
-    | Some '"' => ParseOk (Stream.pop stream, AST.create_node (Str acc))
+    | Some '"' => ParseOk (Stream.pop stream, create_node (Str acc))
     | Some c => parse_string (Stream.pop stream) (append_char acc c)
     | None => ParseFail "Unterminated string."
     };
@@ -65,7 +65,7 @@ module Parser (AST: Common.AST_Type) => {
       | "true" => ParseOk (stream, Constants.true_node)
       | "false" => ParseOk (stream, Constants.false_node)
       | "" => ParseFail "Parsed empty identifier"
-      | _ => ParseOk (stream, AST.create_node (Ident acc))
+      | _ => ParseOk (stream, create_node (Ident acc))
       }
     | Some c => parse_ident (Stream.pop stream) (append_char acc c)
     };
@@ -78,7 +78,7 @@ module Parser (AST: Common.AST_Type) => {
         | _ => None
         };
       switch num {
-      | Some f => ParseOk (stream, AST.create_node (Num f))
+      | Some f => ParseOk (stream, create_node (Num f))
       | None => ParseFail ("Could not parse number [" ^ acc ^ "].")
       }
     };
@@ -93,7 +93,7 @@ module Parser (AST: Common.AST_Type) => {
     | ParseOk (stream, node) =>
       ParseOk (
         stream,
-        AST.create_node (List [AST.create_node (Ident ident_name), node])
+        create_node (List [create_node (Ident ident_name), node])
       )
     | ParseFail "Unexpected whitespace" =>
       ParseFail ("Unexpected whitespace after " ^ ident_name)
@@ -141,10 +141,10 @@ module Parser (AST: Common.AST_Type) => {
     | Some _ => parse_ident stream ""
     | None => UnexpectedEnd
     }
-  and parse_list (stream: Stream.t) (acc: list AST.astNodeT) :parseResult =>
+  and parse_list (stream: Stream.t) (acc: list astNodeT) :parseResult =>
     switch (Stream.peek stream) {
     | Some ')' =>
-      ParseOk (Stream.pop stream, AST.create_node (List (List.rev acc)))
+      ParseOk (Stream.pop stream, create_node (List (List.rev acc)))
     | Some ';' => parse_list (pop_newline (Stream.pop stream)) acc
     | Some ' '
     | Some '\t'
@@ -159,39 +159,39 @@ module Parser (AST: Common.AST_Type) => {
     };
   let rec parse_multi
           (stream: Stream.t)
-          (acc: list AST.astNodeT)
-          :Common.result (list AST.astNodeT) AST.exceptionT =>
+          (acc: list astNodeT)
+          :Common.result (list astNodeT) exceptionT =>
     switch (Stream.peek stream) {
     | Some _ =>
       switch (parse stream) {
       | ParseOk (stream, node) => parse_multi stream [node, ...acc]
-      | ParseFail error => AST.create_exception error
-      | UnexpectedEnd => AST.create_exception "Unexpected end of input."
+      | ParseFail error => create_exception error
+      | UnexpectedEnd => create_exception "Unexpected end of input."
       }
     | None => Ok (List.rev acc)
     };
   let parse_multi
       (s: string)
-      :Common.result (list AST.astNodeT) AST.exceptionT =>
+      :Common.result (list astNodeT) exceptionT =>
     parse_multi (Stream.create s) [];
   let rec trim_comments (stream: Stream.t) =>
     switch (Stream.peek stream) {
     | Some ';' => trim_comments (pop_newline (Stream.pop stream))
     | _ => stream
     };
-  let parse_single s :Common.result AST.astNodeT AST.exceptionT => {
+  let parse_single s :Common.result astNodeT exceptionT => {
     let stream = Stream.create s;
     switch (parse stream) {
     | ParseOk (s, node) =>
       switch (Stream.peek (trim_comments s)) {
       | None => Ok node
       | Some c =>
-        AST.create_exception (
+        create_exception (
           "Unexpected character [" ^ append_char "" c ^ "]."
         )
       }
-    | ParseFail error => AST.create_exception error
-    | UnexpectedEnd => AST.create_exception "Unexpected end of input."
+    | ParseFail error => create_exception error
+    | UnexpectedEnd => create_exception "Unexpected end of input."
     }
   };
 };

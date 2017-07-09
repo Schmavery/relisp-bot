@@ -62,16 +62,14 @@ let scroll_bottom obj => setScrollTop obj (getScrollHeight obj);
 
 Random.self_init ();
 
-module AST = Common.AST Common.BasicEvalState;
+module AST = Common.AST;
 
-module Eval = Evaluate.Eval AST;
+module Eval = Evaluate.Eval;
 
-module Parser = Parse.Parser Eval.AST;
+module Builtins = BuiltinFuncs.Builtins Environment;
 
-module Builtins = BuiltinFuncs.Builtins Environment Eval;
-
-let process_input (in_str: string) (state: Eval.evalStateT) ::cb :unit =>
-  switch (Parser.parse_single in_str) {
+let process_input (state: AST.evalStateT) ::cb in_str :unit =>
+  switch (Parse.Parser.parse_single in_str) {
   | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) ::state ::cb
   | Error _ as e => cb (e, state)
   };
@@ -116,7 +114,6 @@ setOnKeyDown
         history := [in_str, ...!history];
         position := 0;
         process_input
-          in_str
           !state
           cb::(
             fun (res, new_state) => {
@@ -124,9 +121,10 @@ setOnKeyDown
               state := new_state;
               setValue input_element "";
               add_console_element ("> " ^ in_str);
-              Eval.AST.to_string res |> add_console_element
+              AST.to_string res |> add_console_element
             }
-          );
+          )
+          in_str;
         Js.false_
       | 38 /* UpArrow */ =>
         switch (moveHistory 1) {

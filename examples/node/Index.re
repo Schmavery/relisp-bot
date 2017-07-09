@@ -33,16 +33,14 @@ let rl = Readline.createInterface rlDef;
 
 Random.self_init ();
 
-module AST = Common.AST Common.BasicEvalState;
+module AST = Common.AST;
 
-module Eval = Evaluate.Eval AST;
+module Eval = Evaluate.Eval;
 
-module Parser = Parse.Parser Eval.AST;
+module Builtins = BuiltinFuncs.Builtins Environment;
 
-module Builtins = BuiltinFuncs.Builtins Environment Eval;
-
-let process_input (state: Eval.evalStateT) ::cb in_str :unit =>
-  switch (Parser.parse_single in_str) {
+let process_input (state: AST.evalStateT) ::cb in_str :unit =>
+  switch (Parse.Parser.parse_single in_str) {
   | Ok e => Eval.eval e ctx::(Eval.create_initial_context state) ::state ::cb
   | Error _ as e => cb (e, state)
   };
@@ -56,7 +54,7 @@ let rec prompt state =>
         state
         cb::(
           fun (result, state) => {
-            print_endline (Eval.AST.to_string result);
+            print_endline (AST.to_string result);
             prompt state
           }
         )
@@ -64,7 +62,7 @@ let rec prompt state =>
 
 let state = Builtins.add_builtins Eval.empty;
 
-switch (Parser.parse_single "(load \"std\")") {
+switch (Parse.Parser.parse_single "(load \"std\")") {
 | Ok e =>
   Eval.eval
     e
@@ -77,13 +75,13 @@ switch (Parser.parse_single "(load \"std\")") {
           print_endline "Stdlib autoloaded successfully.";
           prompt s
         | Error _=>
-          print_endline (Eval.AST.to_string res);
+          print_endline (AST.to_string res);
           print_endline "Error evaluating stdlib, continuing...";
           prompt state
         }
     )
 | Error _ as e =>
-  print_endline (Eval.AST.to_string e);
+  print_endline (AST.to_string e);
   print_endline "Error parsing stdlib, continuing...";
   prompt state
 };

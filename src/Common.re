@@ -39,7 +39,7 @@ module type EvalStateT = {
   let add_to_usertable: string => uuidT => t 'a => t 'a;
 };
 
-module BasicEvalState: EvalStateT = {
+module EvalState: EvalStateT = {
   type t 'a = {
     userTable: StringMap.t uuidT,
     symbolTable: StringMap.t uuidT,
@@ -73,7 +73,6 @@ module BasicEvalState: EvalStateT = {
 };
 
 module type AST_Type = {
-  module EvalState: EvalStateT;
   type evalStateT = EvalState.t astNodeT
   and exceptionT = (list string, astNodeT)
   and astNodeT = {
@@ -117,8 +116,7 @@ module type AST_Type = {
   let to_string: result astNodeT exceptionT => string;
 };
 
-module AST (EvalState: EvalStateT) :AST_Type => {
-  module EvalState = EvalState;
+module AST: AST_Type = {
   type astNodeT = {
     uuid: uuidT,
     value: valueT
@@ -203,10 +201,4 @@ module AST (EvalState: EvalStateT) :AST_Type => {
       }
     | Error ex => string_of_exception ex
     };
-};
-
-module Constants (AST: AST_Type) => {
-  let empty_node = AST.create_node (List []);
-  let true_node = AST.create_node (Bool true);
-  let false_node = AST.create_node (Bool false);
 };
