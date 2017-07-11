@@ -225,7 +225,21 @@ let run_test_section (section: testSectionT) (numfail, numsuccess) cb => {
     )
 };
 
-let run_test_file tests cb => fold_cb run_test_section (0, 0) tests cb;
+let print_summary cb (failed, total) =>
+  if (failed == 0) {
+    print_succeed (
+      "\nTotal: All " ^ string_of_int total ^ " tests passed :)"
+    )
+  } else {
+    print_fail (
+      "\nTotal: " ^
+      string_of_int failed ^
+      " out of " ^ string_of_int total ^ " tests failed :("
+    )
+  };
+
+let run_test_file tests cb =>
+  fold_cb run_test_section (0, 0) tests (print_summary cb);
 
 load_test
   "test"
