@@ -41,5 +41,26 @@
     "(((((1(()1)))))))" : "[Exception of \"Unexpected character [)].\"]",
     "(((((1(()1)))())())())())" : "[Exception of \"Unexpected character [(].\"]",
     "(\"something goes here)": "[Exception of \"Unterminated string.\"]"
+  }},
+  {
+  "name": "evaluate simple expressions",
+  "type": "eval",
+  "tests": {
+    "(+ 1 2)": "3",
+    "(+ 1 2 (+ 1 2))": "6",
+    "(+ 1 2 (- 0 1))": "2"
+  }},
+  {
+  "name": "load the stdlib",
+  "type": "eval",
+  "tests": {
+    "(load \"std\")": "()"
+  }},
+  {
+  "name": "handle lambdas",
+  "type": "eval",
+  "tests": {
+    "((lambda (x) (+ x 1)) 1)": "2",
+    "((lambda (x n) (x n)) (lambda (x) (+ x 1)) 1)": "2"
   }}
 ]
