@@ -181,14 +181,20 @@ module AST: AST_Type = {
   and string_of_exception (lst: list string, node: astNodeT) =>
     "[Exception of " ^
     to_string (Ok node) ^
-    "]\nTrace: " ^ String.concat "\n       " (List.rev lst)
+    "]" ^ (
+      if (List.length lst > 0) {
+        "\nTrace: " ^ String.concat "\n       " (List.rev lst)
+      } else {
+        ""
+      }
+    )
   and to_string (ast: result astNodeT exceptionT) :string =>
     switch ast {
     | Ok value =>
       switch value.value {
       | Ident x => x
       | Str x => "\"" ^ x ^ "\""
-      | Num x => string_of_float x
+      | Num x => Printf.sprintf "%g" x
       | Bool x => string_of_bool x
       | Ref _ => "[Ref]"
       | List x =>
