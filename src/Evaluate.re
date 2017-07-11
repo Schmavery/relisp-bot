@@ -30,7 +30,7 @@ module type EvalT = {
     unit;
 };
 
-module Eval :EvalT = {
+module Eval: EvalT = {
   module AST = Common.AST;
   module EvalState = Common.EvalState;
   module Constants = Constants;
@@ -50,7 +50,7 @@ module Eval :EvalT = {
   /***/
   let create_initial_context (state: evalStateT) => {
     AST.argsUuidMap: StringMap.empty,
-    AST.argsTable: EvalState.usertable state,
+    AST.argsTable: state.userTable,
     AST.depth: 0
   };
 
@@ -60,7 +60,7 @@ module Eval :EvalT = {
 
   /***/
   let is_reserved_symbol state ident_name =>
-    StringMapHelper.get ident_name (EvalState.symboltable state) == None;
+    StringMapHelper.get ident_name state.EvalState.symbolTable == None;
 
   /***/
   let define_native_symbol state (ident_name: string) (node: astNodeT) =>
@@ -75,14 +75,14 @@ module Eval :EvalT = {
   /***/
   let resolve_ident (ident_name: string) (ctx: ctxT) state :option astNodeT => {
     let uuid =
-      switch (StringMapHelper.get ident_name (EvalState.symboltable state)) {
+      switch (StringMapHelper.get ident_name state.EvalState.symbolTable) {
       | Some _ as uuid => uuid
       | None => StringMapHelper.get ident_name ctx.argsTable
       };
     switch uuid {
     | None => None
     | Some x =>
-      switch (StringMapHelper.get x (EvalState.uuidmap state)) {
+      switch (StringMapHelper.get x state.EvalState.uuidToNodeMap) {
       | Some x => Some x
       | None =>
         switch (StringMapHelper.get x ctx.argsUuidMap) {
@@ -181,7 +181,8 @@ module Eval :EvalT = {
                       fun res =>
                         switch res {
                         | (Ok x, state) => eval x ::ctx ::state ::cb
-                        | (Error (lst, ex), state) => cb (Error ([name, ...lst], ex), state)
+                        | (Error (lst, ex), state) =>
+                          cb (Error ([name, ...lst], ex), state)
                         }
                     }
                   )
@@ -231,7 +232,8 @@ module Eval :EvalT = {
               | (Ok args, state) =>
                 native.func
                   args ctx::{...ctx, depth: ctx.depth + 1} ::state ::cb
-              | (Error (trace, ex), s) => cb (Error ([func_name, ...trace], ex), s)
+              | (Error (trace, ex), s) =>
+                cb (Error ([func_name, ...trace], ex), s)
               }
             | Func {func, args, scope, vararg} =>
               switch maybe_args {
@@ -260,7 +262,8 @@ module Eval :EvalT = {
                   };
                   eval func ::ctx ::state ::cb
                 }
-              | (Error (trace, ex), s) => cb (Error ([func_name, ...trace], ex), s)
+              | (Error (trace, ex), s) =>
+                cb (Error ([func_name, ...trace], ex), s)
               }
             | _ => assert false
             }
