@@ -1,4 +1,4 @@
-let to_json: 'a => Js.Json.t = [%bs.raw
+[%%bs.raw
   {|
   function toJson(o) {
     switch (typeof o){
@@ -10,16 +10,11 @@ let to_json: 'a => Js.Json.t = [%bs.raw
         throw new Error("Cannot serialize functions");
       case "object":
         if (Array.isArray(o)){
-          return [o.hasOwnProperty("tag") ? o.tag : -1, o.map(toJSON)]);
+          return [o.hasOwnProperty("tag") ? o.tag : -1, o.map(toJson)];
         }
         throw new Error("Cannot serialize unidentified object [" + o + "].")
     }
   }
-|}
-];
-
-let from_json: Js.Json.t => 'a = [%bs.raw
-  {|
   function fromJson(o) {
     switch (typeof o){
       case "boolean":
@@ -42,10 +37,14 @@ let from_json: Js.Json.t => 'a = [%bs.raw
         throw new Error("Cannot deserialize unidentified object [" + o + "].")
     }
   }
+  global.toJson = toJson;
+  global.fromJson = fromJson;
 |}
 ];
 
-let to_string (node: Common.AST.astNodeT) => Js.Json.stringify (to_json node);
+external to_json : 'a => Js.Json.t = "toJson" [@@bs.val] [@@bs.scope "global"];
 
-let from_string (s: string) :Common.AST.astNodeT =>
-  from_json (Js.Json.parseExn s);
+external from_json : Js.Json.t => 'a = "fromJson" [@@bs.val] [@@bs.scope "global"];
+
+let to_string o => Js.Json.stringify (to_json o);
+let from_string s => from_json (Js.Json.parseExn s);
