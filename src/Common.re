@@ -23,14 +23,14 @@ module StringMapHelper = {
       )
       m1
       m2;
-  let to_string table =>
+  let to_string (table: StringMap.t string) =>
     StringMap.fold (fun k v a => a ^ k ^ ":\t" ^ v ^ "\n") table "";
 };
 
 module EvalState = {
   type t 'a = {
     userTable: StringMap.t uuidT,
-    symbolTable: StringMap.t uuidT,
+    symbolTable: StringMap.t 'a,
     uuidToNodeMap: StringMap.t 'a
   };
   let empty = {
@@ -42,14 +42,14 @@ module EvalState = {
     "====state====\nuserTable:\n" ^
     StringMapHelper.to_string state.userTable ^
     "-------------\nsymbolTable:\n" ^
-    StringMapHelper.to_string state.symbolTable ^ "\n=============";
+    StringMap.fold (fun k v a => a ^ k ^ "\n") state.symbolTable "";
   let add_to_uuidmap uuid node state => {
     ...state,
     uuidToNodeMap: StringMap.add uuid node state.uuidToNodeMap
   };
-  let add_to_symboltable ident_name uuid state => {
+  let add_to_symboltable ident_name node state => {
     ...state,
-    symbolTable: StringMap.add ident_name uuid state.symbolTable
+    symbolTable: StringMap.add ident_name node state.symbolTable
   };
   let add_to_usertable ident_name uuid state => {
     ...state,

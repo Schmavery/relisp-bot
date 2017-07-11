@@ -64,8 +64,7 @@ module Eval: EvalT = {
 
   /***/
   let define_native_symbol state (ident_name: string) (node: astNodeT) =>
-    state |> EvalState.add_to_symboltable ident_name node.uuid |>
-    EvalState.add_to_uuidmap node.uuid node;
+    state |> EvalState.add_to_symboltable ident_name node;
 
   /***/
   let define_user_symbol state (ident_name: string) (node: astNodeT) =>
@@ -73,26 +72,24 @@ module Eval: EvalT = {
     EvalState.add_to_uuidmap node.uuid node;
 
   /***/
-  let resolve_ident (ident_name: string) (ctx: ctxT) state :option astNodeT => {
-    let uuid =
-      switch (StringMapHelper.get ident_name state.EvalState.symbolTable) {
-      | Some _ as uuid => uuid
-      | None => StringMapHelper.get ident_name ctx.argsTable
-      };
-    switch uuid {
-    | None => None
-    | Some x =>
-      switch (StringMapHelper.get x state.EvalState.uuidToNodeMap) {
-      | Some x => Some x
-      | None =>
-        switch (StringMapHelper.get x ctx.argsUuidMap) {
+  let resolve_ident (ident_name: string) (ctx: ctxT) state :option astNodeT =>
+    switch (StringMapHelper.get ident_name state.EvalState.symbolTable) {
+    | Some node => Some node
+    | None =>
+      switch (StringMapHelper.get ident_name ctx.argsTable) {
+      | None => None
+      | Some x =>
+        switch (StringMapHelper.get x state.EvalState.uuidToNodeMap) {
         | Some x => Some x
         | None =>
-          failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
+          switch (StringMapHelper.get x ctx.argsUuidMap) {
+          | Some x => Some x
+          | None =>
+            failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
+          }
         }
       }
-    }
-  };
+    };
 
   /***/
   let rec create_lambda_arg_map
