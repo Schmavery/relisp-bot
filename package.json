@@ -20,13 +20,12 @@
     "pack": "browserify lib/js/examples/web/index.js > assets/lisp.js",
     "server": "browserify lib/js/examples/web/index.js > assets/lisp.js && rsync stdlib/* assets/stdlib/ && http-server assets",
     "cli": "node lib/js/examples/node/index.js",
-    "deploy": "node scripts/deploy-ghpages.js"
-  },
-  "dependencies": {
-    "bs-platform": "https://github.com/bloomberg/bucklescript.git"
+    "deploy": "node scripts/deploy-ghpages.js",
+    "test": "node lib/js/test/test.js"
   },
   "devDependencies": {
     "browserify": "^13.1.1",
+    "bs-platform": "https://github.com/bloomberg/bucklescript.git",
     "gh-pages": "^0.12.0",
     "http-server": "^0.10.0"
   }

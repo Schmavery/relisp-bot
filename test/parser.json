@@ -1,0 +1,45 @@
+[
+  {
+  "name": "parse simple lists",
+  "type": "parse",
+  "tests": {
+    "()": "()",
+    "(1)": "(1)",
+    "(1 2 3)": "(1 2 3)",
+    "(1 2 3 4 5 6 7 8 9 10)": "(1 2 3 4 5 6 7 8 9 10)"
+  }},
+  {
+  "name": "parse primitive types",
+  "type": "parse",
+  "tests": {
+    "(123980 123 414214)": "(123980 123 414214)",
+    "(true false)": "(true false)",
+    "(fn \"something\")": "(fn \"something\")"
+  }},
+  {
+  "name": "parse nested lists",
+  "type": "parse",
+  "tests": {
+    "(())": "(())",
+    "(() () ())": "(() () ())",
+    "((()) ((())) ())": "((()) ((())) ())"
+  }},
+  {
+  "name": "parse repeated spaces",
+  "type": "parse",
+  "tests": {
+    "(1 2)": "(1 2)",
+    "(1       2)": "(1 2)",
+    "(1       2    4  )": "(1 2 4)"
+  }},
+  {
+  "name": "reject syntactically invalid programs",
+  "type": "parse",
+  "tests": {
+    "(1 2 3" : "[Exception of \"Unterminated list.\"]",
+    "(1 ((2 3)": "[Exception of \"Unterminated list.\"]",
+    "(((((1(()1)))))))" : "[Exception of \"Unexpected character [)].\"]",
+    "(((((1(()1)))())())())())" : "[Exception of \"Unexpected character [(].\"]",
+    "(\"something goes here)": "[Exception of \"Unterminated string.\"]"
+  }}
+]

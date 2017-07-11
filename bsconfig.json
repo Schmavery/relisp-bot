@@ -3,6 +3,7 @@
     "name" : "ReLispBot",
     "sources": [
       { "dir": "src" },
+      { "dir": "test" },
       { "dir": "examples/web", "type": "dev"},
       { "dir": "examples/node", "type": "dev"},
       { "dir": "examples/bot", "type": "dev"}
