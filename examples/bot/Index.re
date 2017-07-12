@@ -39,7 +39,9 @@ let log_and_call cb err => {
 let create_tables db (cb: Sqlite.err => unit) =>
   Sqlite.exec
     db
-    "CREATE TABLE IF NOT EXISTS Usertable (id TEXT, usertable TEXT); CREATE TABLE IF NOT EXISTS UuidMap (id BLOB, node BLOB);"
+    (
+      "CREATE TABLE IF NOT EXISTS Usertable (id TEXT NOT NULL PRIMARY KEY, usertable TEXT);" ^ "CREATE TABLE IF NOT EXISTS UuidMap (id TEXT NOT NULL PRIMARY KEY, node TEXT NOT NULL);"
+    )
     (log_and_call cb);
 
 let put_usertable
@@ -207,7 +209,8 @@ let process_input
 
 let db = Sqlite.database ":memory:";
 
-let split_input : string => (string, string) = [%bs.raw {|
+let split_input: string => (string, string) = [%bs.raw
+  {|
   function(s) {
     var firstparen = s.indexOf('(');
     var firstspace = s.indexOf(' ');
@@ -216,26 +219,28 @@ let split_input : string => (string, string) = [%bs.raw {|
     else
       return ["debug-"+s.split(' ')[0], s.split(' ').slice(1).join(' ')]
   }
-|}];
+|}
+];
 
 let rec prompt uuidMap =>
   Readline.question
     rl
     "> "
-    (fun in_str => {
-      let (threadid, body) = split_input in_str;
-      process_input
-        uuidMap
-        cb::(
-          fun (result, uuidMap) => {
-            print_endline (AST.to_string result);
-            prompt uuidMap
-          }
-        )
-        db
-        threadid
-        body
-    }
+    (
+      fun in_str => {
+        let (threadid, body) = split_input in_str;
+        process_input
+          uuidMap
+          cb::(
+            fun (result, uuidMap) => {
+              print_endline (AST.to_string result);
+              prompt uuidMap
+            }
+          )
+          db
+          threadid
+          body
+      }
     );
 
 create_tables db (fun _ => load_uuidmap db (fun uuidmap => prompt uuidmap));
