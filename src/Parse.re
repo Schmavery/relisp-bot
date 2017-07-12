@@ -47,7 +47,7 @@ module Parser = {
         ParseFail ("Invalid escape sequence \\" ^ append_char "" c ^ ".")
       | None => ParseFail "Unterminated string."
       }
-    | Some '"' => ParseOk (Stream.pop stream, create_node (Str acc))
+    | Some '"' => ParseOk (Stream.pop stream, Str acc)
     | Some c => parse_string (Stream.pop stream) (append_char acc c)
     | None => ParseFail "Unterminated string."
     };
@@ -62,10 +62,10 @@ module Parser = {
     | Some ';'
     | None =>
       switch acc {
-      | "true" => ParseOk (stream, Constants.true_node)
-      | "false" => ParseOk (stream, Constants.false_node)
+      | "true" => ParseOk (stream, Bool true)
+      | "false" => ParseOk (stream, Bool false)
       | "" => ParseFail "Parsed empty identifier"
-      | _ => ParseOk (stream, create_node (Ident acc))
+      | _ => ParseOk (stream, (Ident acc))
       }
     | Some c => parse_ident (Stream.pop stream) (append_char acc c)
     };
@@ -78,7 +78,7 @@ module Parser = {
         | _ => None
         };
       switch num {
-      | Some f => ParseOk (stream, create_node (Num f))
+      | Some f => ParseOk (stream, (Num f))
       | None => ParseFail ("Could not parse number [" ^ acc ^ "].")
       }
     };
@@ -93,7 +93,7 @@ module Parser = {
     | ParseOk (stream, node) =>
       ParseOk (
         stream,
-        create_node (List [create_node (Ident ident_name), node])
+        (List [(Ident ident_name), node])
       )
     | ParseFail "Unexpected whitespace" =>
       ParseFail ("Unexpected whitespace after " ^ ident_name)
@@ -144,7 +144,7 @@ module Parser = {
   and parse_list (stream: Stream.t) (acc: list astNodeT) :parseResult =>
     switch (Stream.peek stream) {
     | Some ')' =>
-      ParseOk (Stream.pop stream, create_node (List (List.rev acc)))
+      ParseOk (Stream.pop stream, (List (List.rev acc)))
     | Some ';' => parse_list (pop_newline (Stream.pop stream)) acc
     | Some ' '
     | Some '\t'

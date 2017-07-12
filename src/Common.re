@@ -14,7 +14,7 @@ module StringMapHelper = {
   let union m1 m2 =>
     StringMap.merge
       (
-        fun key v1 v2 =>
+        fun _key v1 v2 =>
           switch (v1, v2) {
           | (None, Some x)
           | (Some x, _) => Some x
@@ -45,7 +45,7 @@ module EvalState = {
     StringMapHelper.to_string state.userTable ^
     "-------------\nsymbolTable:\n" ^
     StringMap.fold (fun k _v a => a ^ k ^ "\n") state.symbolTable "";
-  let add_to_uuidmap uuid node state => {
+  let add_to_uuidmap (node: 'a) (uuid: uuidT) state :t 'a => {
     ...state,
     uuidToNodeMap: StringMap.add uuid node state.uuidToNodeMap,
     addedUuids: [uuid, ...state.addedUuids]
@@ -62,16 +62,16 @@ module EvalState = {
 
 module type AST_Type = {
   type evalStateT = EvalState.t astNodeT
+  and uuidOrNodeT =
+    | Uuid uuidT
+    | Node astNodeT
   and exceptionT = (list string, astNodeT)
-  and astNodeT = {
-    uuid: uuidT,
-    value: valueT
-  }
   and funcT = {
     func: astNodeT,
     args: list string,
     vararg: option string,
     scope: StringMap.t string,
+    recur: uuidT,
     is_macro: bool
   }
   and nativeFuncT =
@@ -85,11 +85,10 @@ module type AST_Type = {
     is_macro: bool
   }
   and ctxT = {
-    argsUuidMap: StringMap.t astNodeT,
-    argsTable: StringMap.t uuidT,
+    argsTable: StringMap.t uuidOrNodeT,
     depth: int
   }
-  and valueT =
+  and astNodeT =
     | Ident string
     | Str string
     | Num float
@@ -98,23 +97,22 @@ module type AST_Type = {
     | List (list astNodeT)
     | Func funcT
     | NativeFunc nativeFuncRecT;
-  let create_node: valueT => astNodeT;
-  let gen_uuid: unit => uuidT;
+  let hash: astNodeT => uuidT;
   let create_exception: string => result 'a exceptionT;
   let to_string: result astNodeT exceptionT => string;
 };
 
 module AST: AST_Type = {
-  type astNodeT = {
-    uuid: uuidT,
-    value: valueT
-  }
-  and exceptionT = (list string, astNodeT)
+  type exceptionT = (list string, astNodeT)
+  and uuidOrNodeT =
+    | Uuid uuidT
+    | Node astNodeT
   and funcT = {
     func: astNodeT,
     args: list string,
     vararg: option string,
     scope: StringMap.t string,
+    recur: uuidT,
     is_macro: bool
   }
   and nativeFuncT =
@@ -128,11 +126,10 @@ module AST: AST_Type = {
     is_macro: bool
   }
   and ctxT = {
-    argsUuidMap: StringMap.t astNodeT,
-    argsTable: StringMap.t uuidT,
+    argsTable: StringMap.t uuidOrNodeT,
     depth: int
   }
-  and valueT =
+  and astNodeT =
     | Ident string
     | Str string
     | Num float
@@ -142,20 +139,59 @@ module AST: AST_Type = {
     | Func funcT
     | NativeFunc nativeFuncRecT
   and evalStateT = EvalState.t astNodeT;
-  let gen_uuid () => {
-    let s4 () => Printf.sprintf "%04x" (Random.int 65536);
-    s4 () ^
-    s4 () ^
-    "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
+  /* let gen_uuid () => { */
+  /*   let s4 () => Printf.sprintf "%04x" (Random.int 65536); */
+  /*   s4 () ^ */
+  /*   s4 () ^ */
+  /*   "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 () */
+  /* }; */
+  let create_exception text => Error ([], Str text);
+  let hash_hashstring s => {
+    let hash = ref 0;
+    for i in 0 to (String.length s - 1) {
+      hash := !hash lsl 5 - !hash + Char.code s.[i]
+    };
+    string_of_int !hash
   };
-  let create_node value => {uuid: gen_uuid (), value};
-  let create_exception text => Error ([], create_node (Str text));
-  let rec string_of_func (f: funcT) => {
-    let title =
+  let rec hashstring_of_func (f: funcT) => {
+    let kind =
       if f.is_macro {
-        "Macro"
+        "macro"
       } else {
-        "Function"
+        "function"
+      };
+    let arg_list =
+      switch f.vararg {
+      | Some vararg_name => f.args @ ["... " ^ vararg_name]
+      | None => f.args
+      };
+    let args = String.concat " " arg_list;
+    let scope_list = StringMap.fold (fun k v a => [k ^ v, ...a]) f.scope [];
+    let scope = String.concat " " scope_list;
+    /* Intentionally don't include the recur uuid in hash */
+    "(" ^ kind ^ ":" ^ scope ^ ":" ^ args ^ ":" ^ to_hashstring f.func ^ ")"
+  }
+  and to_hashstring (ast: astNodeT) :string =>
+    switch ast {
+    | Ident x => x
+    | Str x => "\"" ^ x ^ "\""
+    | Num x => Printf.sprintf "%g" x
+    | Bool x => string_of_bool x
+    | Ref _ => "[Ref]"
+    | List x =>
+      "(" ^ (List.map (fun v => to_hashstring v) x |> String.concat " ") ^ ")"
+    | Func f => hashstring_of_func f
+    | NativeFunc f =>
+      Js.log f;
+      print_endline "Cannot calculate hash of native func"
+    };
+  let hash node => hash_hashstring (to_hashstring node); /* todo: make this smaller */
+  let rec string_of_func (f: funcT) => {
+    let kind =
+      if f.is_macro {
+        "macro"
+      } else {
+        "function"
       };
     let arg_list =
       switch f.vararg {
@@ -164,7 +200,7 @@ module AST: AST_Type = {
       };
     let args = String.concat ", " arg_list;
     let body = to_string (Ok f.func);
-    "[" ^ title ^ ": " ^ args ^ " => " ^ body ^ "]"
+    "[" ^ kind ^ ": " ^ args ^ " => " ^ body ^ "]"
   }
   and string_of_exception (lst: list string, node: astNodeT) =>
     "[Exception of " ^
@@ -179,7 +215,7 @@ module AST: AST_Type = {
   and to_string (ast: result astNodeT exceptionT) :string =>
     switch ast {
     | Ok value =>
-      switch value.value {
+      switch value {
       | Ident x => x
       | Str x => "\"" ^ x ^ "\""
       | Num x => Printf.sprintf "%g" x

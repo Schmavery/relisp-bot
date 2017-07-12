@@ -30,15 +30,10 @@ module Builtins (Environment: EnvironmentT) => {
           ctx::(ctx: AST.ctxT)
           state::(state: AST.evalStateT)
           cb::(
-            cb:
-              (
-                result AST.astNodeT AST.exceptionT,
-                AST.evalStateT
-              ) =>
-              unit
+            cb: (result AST.astNodeT AST.exceptionT, AST.evalStateT) => unit
           ) =>
         func args ::ctx ::state |> cb;
-      let node = AST.create_node (NativeFunc {func: asyncf, is_macro});
+      let node = AST.NativeFunc {func: asyncf, is_macro};
       Eval.define_native_symbol state name node
     };
     let add_native_lambda_async
@@ -47,7 +42,7 @@ module Builtins (Environment: EnvironmentT) => {
         (func: AST.nativeFuncT)
         state::(state: AST.evalStateT)
         :AST.evalStateT => {
-      let node = AST.create_node (NativeFunc {func, is_macro});
+      let node = AST.NativeFunc {func, is_macro};
       Eval.define_native_symbol state name node
     };
     /* Define Builtins */
@@ -61,17 +56,17 @@ module Builtins (Environment: EnvironmentT) => {
         ::state
         macro::false
         (
-          fun args ::ctx ::state => (
+          fun args ctx::_ ::state => (
             switch args {
             | [] =>
               AST.create_exception ("Called '" ^ op_name ^ "' with no args.")
-            | [{value: Num _ as hd}, ...tl] =>
+            | [Num _ as hd, ...tl] =>
               let res =
                 List.fold_left
                   (
                     fun acc v =>
                       switch (acc, v) {
-                      | (Ok (AST.Num acc_num), {AST.value: Num x}) =>
+                      | (Ok (AST.Num acc_num), AST.Num x) =>
                         Ok (AST.Num (op acc_num x))
                       | (Error _ as ex, _) => ex
                       | _ =>
@@ -84,7 +79,7 @@ module Builtins (Environment: EnvironmentT) => {
                   (Ok hd)
                   tl;
               switch res {
-              | Ok v => Ok (AST.create_node v)
+              | Ok v => Ok v
               | Error e => Error e
               }
             | _ =>
@@ -107,17 +102,20 @@ module Builtins (Environment: EnvironmentT) => {
             (state: AST.evalStateT)
             :result (StringMap.t uuidT, AST.evalStateT) string =>
       switch node {
-      | {value: Ident i} =>
+      | Ident i =>
         switch (Eval.resolve_ident i ctx state) {
-        | None => Ok (map, state)
+        | None
+        /* Don't remember native functions (they're from symboltable)*/
+        | Some (NativeFunc _) => Ok (map, state)
         /* TODO: Intelligently parse body to statically check
            for undefined identifiers (idents could be captured by
            another lambda within the body of this lambda) */
-        | Some x =>
-          let new_state = Eval.add_to_uuid_map state x;
-          Ok (StringMap.add i x.uuid map, new_state)
+        | Some node =>
+          let hash = AST.hash node;
+          let new_state = Eval.add_to_uuid_map state hash node;
+          Ok (StringMap.add i hash map, new_state)
         }
-      | {value: List lst} =>
+      | List lst =>
         List.fold_left
           (
             fun acc v =>
@@ -129,9 +127,9 @@ module Builtins (Environment: EnvironmentT) => {
           )
           (Ok (map, state))
           lst
-      | {value: Num _}
-      | {value: Str _}
-      | {value: Bool _} => Ok (map, state)
+      | Num _
+      | Str _
+      | Bool _ => Ok (map, state)
       | _ => Error "Found non-literal in lambda body."
       };
     let rec parse_lambda_args
@@ -140,35 +138,49 @@ module Builtins (Environment: EnvironmentT) => {
             :result (list string, option string) string =>
       switch args {
       | [] => Ok (List.rev acc, None)
-      | [{value: Ident "..."}, {value: Ident vararg}] =>
-        Ok (List.rev acc, Some vararg)
-      | [{value: Ident "..."}, ..._] =>
+      | [Ident "...", Ident vararg] => Ok (List.rev acc, Some vararg)
+      | [Ident "...", ..._] =>
         Error "Can only have ... before the last argument name."
-      | [{value: Ident ident}, ...tl] => parse_lambda_args tl [ident, ...acc]
+      | [Ident ident, ...tl] => parse_lambda_args tl [ident, ...acc]
       | _ => Error "Argument defined as not identifier in function definition."
       };
     let parse_lambda_args args => parse_lambda_args args [];
-    let create_lambda_func is_macro args ::ctx ::state => {
-      let uuid = AST.gen_uuid ();
+    let create_lambda_func is_macro (args: list AST.astNodeT) ::ctx ::state => {
       let func_name = if is_macro {"macro"} else {"lambda"};
       switch args {
-      | [{AST.value: List args}, body] =>
+      | [List args, body] =>
         let arg_names = parse_lambda_args args;
         switch arg_names {
         | Error e => (AST.create_exception e, state)
         | Ok (names, vararg) =>
-          switch (
-            create_lambda_scope
-              body (StringMap.singleton "recur" uuid) names ctx state
-          ) {
+          switch (create_lambda_scope body StringMap.empty names ctx state) {
           | Ok (idents, new_state) =>
-            let node = {
-              AST.uuid: uuid,
-              value:
-                Func {func: body, args: names, scope: idents, is_macro, vararg}
-            };
+            /* Here, we need to make a dummy node with all the correct values
+             * except for the recur uuid, then calculate the hash of it.  The hash
+             * ignores the recur field, so it will be the same as the function
+             * node with the correct hash inserted for recur, which is created
+             * afterward. */
+            let node_dummy =
+              AST.Func {
+                func: body,
+                args: names,
+                scope: idents,
+                is_macro,
+                vararg,
+                recur: "dummy"
+              };
+            let hash = AST.hash node_dummy;
+            let node =
+              AST.Func {
+                func: body,
+                args: names,
+                scope: idents,
+                is_macro,
+                vararg,
+                recur: hash
+              };
             /* add recur uuid */
-            let new_state = Eval.add_to_uuid_map new_state node;
+            let new_state = Eval.add_to_uuid_map new_state hash node;
             (Ok node, new_state)
           | Error e => (AST.create_exception e, state)
           }
@@ -193,7 +205,7 @@ module Builtins (Environment: EnvironmentT) => {
         "throw"
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
             | [a] => (Error ([], a), state)
             | lst => received_error expected::2 args::lst name::"throw" ::state
@@ -221,8 +233,8 @@ module Builtins (Environment: EnvironmentT) => {
                       ::state
                       cb::(
                         fun
-                        | (Ok ({value: NativeFunc _} as func), state)
-                        | (Ok ({value: Func _} as func), state) =>
+                        | (Ok (NativeFunc _ as func), state)
+                        | (Ok (Func _ as func), state) =>
                           Eval.eval_lambda
                             func
                             args::[ex]
@@ -250,11 +262,11 @@ module Builtins (Environment: EnvironmentT) => {
         (
           fun args ::ctx ::state cb::return =>
             switch args {
-            | [{value: Ident ident}, {value: Str _}, other]
-            | [{value: Ident ident}, other] =>
-              let docs =
+            | [Ident ident, Str _, other]
+            | [Ident ident, other] =>
+              let _docs = /* TODO: docs */
                 switch args {
-                | [_, {value: Str docs}, _] => docs
+                | [_, Str docs, _] => docs
                 | _ => "No docs."
                 };
               if (ctx.depth > 2) {
@@ -278,14 +290,14 @@ module Builtins (Environment: EnvironmentT) => {
                   ::state
                   cb::(
                     fun
-                    | (Ok {value: NativeFunc _}, _) =>
+                    | (Ok (NativeFunc _), _) =>
                       return (
                         AST.create_exception "Cannot rename builtin function.",
                         state
                       )
                     | (Ok res, state) =>
                       return (
-                        Ok Constants.empty_node,
+                        Ok (List []),
                         Eval.define_user_symbol state ident res
                       )
                     | (Error _, _) as e => return e
@@ -310,7 +322,7 @@ module Builtins (Environment: EnvironmentT) => {
         "quote"
         macro::true
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
             | [el] => (Ok el, state)
             | lst => received_error expected::1 args::lst name::"quote" ::state
@@ -338,10 +350,7 @@ module Builtins (Environment: EnvironmentT) => {
             ::state
             cb::(
               return:
-                (
-                  result (list AST.astNodeT) AST.exceptionT,
-                  AST.evalStateT
-                ) =>
+                (result (list AST.astNodeT) AST.exceptionT, AST.evalStateT) =>
                 unit
             )
             :unit =>
@@ -349,7 +358,7 @@ module Builtins (Environment: EnvironmentT) => {
       | [] => return (Ok acc, state)
       | [v, ...tl] =>
         switch v {
-        | {value: List [{value: Ident "unquote-splice"}, unquote_arg]} =>
+        | List [Ident "unquote-splice", unquote_arg] =>
           Eval.eval
             unquote_arg
             ::ctx
@@ -358,7 +367,7 @@ module Builtins (Environment: EnvironmentT) => {
               fun (res, state) =>
                 switch res {
                 | Error _ as e => return (e, state)
-                | Ok {value: List lst} =>
+                | Ok (List lst) =>
                   traverseH tl (acc @ lst) ::ctx ::state cb::return
                 | Ok _ =>
                   return (
@@ -387,20 +396,14 @@ module Builtins (Environment: EnvironmentT) => {
         ::ctx
         state::(state: AST.evalStateT)
         cb::(
-          return:
-            (
-              result AST.astNodeT AST.exceptionT,
-              AST.evalStateT
-            ) =>
-            unit
+          return: (result AST.astNodeT AST.exceptionT, AST.evalStateT) => unit
         )
         :unit =>
       switch node {
-      | {value: List [{value: Ident "unquote"}, next]} =>
-        Eval.eval next ::ctx ::state cb::return
-      | {value: List [{value: Ident "unquote"}, ...lst]} =>
+      | List [Ident "unquote", next] => Eval.eval next ::ctx ::state cb::return
+      | List [Ident "unquote", ...lst] =>
         return (received_error expected::1 args::lst name::"unquote" ::state)
-      | {value: List lst} =>
+      | List lst =>
         traverseH
           lst
           []
@@ -408,7 +411,7 @@ module Builtins (Environment: EnvironmentT) => {
           ::ctx
           cb::(
             fun
-            | (Ok a, state) => return (Ok (AST.create_node (List a)), state)
+            | (Ok a, state) => return (Ok (List a), state)
             | (Error a, state) => return (Error a, state)
           )
       | a => return (Ok a, state)
@@ -446,8 +449,8 @@ module Builtins (Environment: EnvironmentT) => {
                   fun evaled_cond =>
                     switch (evaled_cond, consequent, alternate) {
                     | ((Error _, _) as e, _, _) => return e
-                    | ((Ok {value: Bool true}, state), eval_me, _)
-                    | ((Ok {value: Bool false}, state), _, eval_me) =>
+                    | ((Ok (Bool true), state), eval_me, _)
+                    | ((Ok (Bool false), state), _, eval_me) =>
                       return (Ok eval_me, state)
                     | ((Ok _, state), _, _) =>
                       return (
@@ -488,7 +491,7 @@ module Builtins (Environment: EnvironmentT) => {
         (
           fun args ::ctx ::state cb::return =>
             switch args {
-            | [{value: Str lib_name}] =>
+            | [Str lib_name] =>
               Environment.load_lib
                 lib_name
                 cb::(
@@ -510,8 +513,7 @@ module Builtins (Environment: EnvironmentT) => {
                           ctx
                           cb::(
                             fun
-                            | Ok state =>
-                              return (Ok Constants.empty_node, state)
+                            | Ok state => return (Ok (List []), state)
                             | Error e => return (Error e, state)
                           )
                       | Error e => return (Error e, state)
@@ -529,10 +531,7 @@ module Builtins (Environment: EnvironmentT) => {
               )
             }
         );
-    let rec equal_helper
-            {AST.value: v1, AST.uuid: uuid1}
-            {AST.value: v2, AST.uuid: uuid2} =>
-      uuid1 == uuid2 ||
+    let rec equal_helper (v1 : AST.astNodeT)  (v2 : AST.astNodeT) =>
       v1 == v2 || (
         switch (v1, v2) {
         | (Ident s1, Ident s2)
@@ -563,9 +562,9 @@ module Builtins (Environment: EnvironmentT) => {
         "="
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
-            | [e1, e2] => (Ok (Eval.to_bool_node (equal_helper e1 e2)), state)
+            | [e1, e2] => (Ok (Bool (equal_helper e1 e2)), state)
             | lst =>
               received_error expected::2 args::lst name::"equal?" ::state
             }
@@ -578,10 +577,10 @@ module Builtins (Environment: EnvironmentT) => {
         "car"
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
-            | [{value: List [first, ..._]}] => (Ok first, state)
-            | [{value: List []}] => (
+            | [List [first, ..._]] => (Ok first, state)
+            | [List []] => (
                 AST.create_exception "Called 'car' on empty list",
                 state
               )
@@ -601,13 +600,10 @@ module Builtins (Environment: EnvironmentT) => {
         "cdr"
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
-            | [{value: List [_, ...rest]}] => (
-                Ok (AST.create_node (List rest)),
-                state
-              )
-            | [{value: List []}] => (
+            | [List [_, ...rest]] => (Ok (List rest), state)
+            | [List []] => (
                 AST.create_exception "Called 'cdr' on empty list",
                 state
               )
@@ -624,12 +620,9 @@ module Builtins (Environment: EnvironmentT) => {
         "cons"
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
-            | [el, {value: List lst}] => (
-                Ok (AST.create_node (List [el, ...lst])),
-                state
-              )
+            | [el, List lst] => (Ok (List [el, ...lst]), state)
             | [_, _] => (
                 AST.create_exception "Expected list as second arg in call to 'cons'",
                 state
@@ -645,11 +638,11 @@ module Builtins (Environment: EnvironmentT) => {
         "DEBUG/print-scope"
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
-            | [{value: Func {scope}}] =>
+            | [Func {scope}] =>
               print_endline (StringMapHelper.to_string scope);
-              (Ok Constants.empty_node, state)
+              (Ok (List []), state)
             | lst =>
               received_error
                 expected::1 args::lst name::"DEBUG/print-scope" ::state
@@ -661,11 +654,11 @@ module Builtins (Environment: EnvironmentT) => {
         "DEBUG/print-state"
         macro::false
         (
-          fun args ::ctx ::state =>
+          fun args ctx::_ ::state =>
             switch args {
             | [] =>
               print_endline (Common.EvalState.to_string state);
-              (Ok Constants.empty_node, state)
+              (Ok (List []), state)
             | lst =>
               received_error
                 expected::0 args::lst name::"DEBUG/print-state" ::state
@@ -679,7 +672,7 @@ module Builtins (Environment: EnvironmentT) => {
         (
           fun args ::ctx state::initial_state ::cb =>
             switch args {
-            | [{value: List [first, ...args]}] =>
+            | [List [first, ...args]] =>
               Eval.eval
                 first
                 ::ctx
@@ -687,8 +680,8 @@ module Builtins (Environment: EnvironmentT) => {
                 cb::(
                   fun (evaled_first, state) =>
                     switch evaled_first {
-                    | Ok ({value: NativeFunc {is_macro: true}} as func)
-                    | Ok ({value: Func {is_macro: true}} as func) =>
+                    | Ok (NativeFunc {is_macro: true} as func)
+                    | Ok (Func {is_macro: true} as func) =>
                       Eval.eval_lambda
                         func ::args ::ctx func_name::"expand" ::state ::cb
                     | Ok _ as e =>
