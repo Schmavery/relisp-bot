@@ -31,21 +31,24 @@ module EvalState = {
   type t 'a = {
     userTable: StringMap.t uuidT,
     symbolTable: StringMap.t 'a,
-    uuidToNodeMap: StringMap.t 'a
+    uuidToNodeMap: StringMap.t 'a,
+    addedUuids: list uuidT
   };
   let empty = {
     userTable: StringMap.empty,
     uuidToNodeMap: StringMap.empty,
-    symbolTable: StringMap.empty
+    symbolTable: StringMap.empty,
+    addedUuids: []
   };
   let to_string state =>
     "====state====\nuserTable:\n" ^
     StringMapHelper.to_string state.userTable ^
     "-------------\nsymbolTable:\n" ^
-    StringMap.fold (fun k v a => a ^ k ^ "\n") state.symbolTable "";
+    StringMap.fold (fun k _v a => a ^ k ^ "\n") state.symbolTable "";
   let add_to_uuidmap uuid node state => {
     ...state,
-    uuidToNodeMap: StringMap.add uuid node state.uuidToNodeMap
+    uuidToNodeMap: StringMap.add uuid node state.uuidToNodeMap,
+    addedUuids: [uuid, ...state.addedUuids]
   };
   let add_to_symboltable ident_name node state => {
     ...state,
