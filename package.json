@@ -26,6 +26,7 @@
   "devDependencies": {
     "browserify": "^13.1.1",
     "bs-platform": "https://github.com/bloomberg/bucklescript.git",
+    "facebook-chat-api": "^1.4.0",
     "gh-pages": "^0.12.0",
     "http-server": "^0.10.0",
     "sqlite3": "^3.1.8"

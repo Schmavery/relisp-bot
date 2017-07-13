@@ -1,188 +1,19 @@
-type errorT;
-
-external readFile :
-  string =>
-  _ [@bs.as "utf8"] =>
-  (errorT => Js.Undefined.t string => unit) =>
-  unit =
-  "" [@@bs.module "fs"];
-
-module Environment: BuiltinFuncs.EnvironmentT = {
-  let load_lib filename ::cb =>
-    readFile
-      ("stdlib/" ^ filename ^ ".lib")
-      (fun _ str => cb (Js.Undefined.to_opt str));
-};
-
-let rlDef =
-  Readline.createInterfaceDef input::Readline.stdin output::Readline.stdout;
-
-let rl = Readline.createInterface rlDef;
-
-Random.self_init ();
-
 module AST = Common.AST;
 
 module Eval = Evaluate.Eval;
 
-module Builtins = BuiltinFuncs.Builtins Environment;
+module Builtins = BuiltinFuncs.Builtins BotEnv;
 
 module StringMap = Common.StringMap;
 
-let log_and_call cb err => {
-  if (not (Js.Null.test (Js.Null.return err))) {
-    Js.log err
-  };
-  cb err
-};
-
-let create_tables db (cb: Sqlite.err => unit) =>
-  Sqlite.exec
-    db
-    (
-      "CREATE TABLE IF NOT EXISTS Usertable (id TEXT NOT NULL PRIMARY KEY, usertable TEXT);" ^ "CREATE TABLE IF NOT EXISTS UuidMap (id TEXT NOT NULL PRIMARY KEY, node TEXT NOT NULL);"
-    )
-    (log_and_call cb);
-
-let put_usertable
-    db
-    (id: string)
-    (table: StringMap.t Common.uuidT)
-    (cb: Sqlite.err => unit) =>
-  Sqlite.run
-    db
-    "INSERT OR REPLACE INTO Usertable ('id', 'usertable') VALUES ($id, $usertable)"
-    {"$id": id, "$usertable": Persist.to_string table}
-    (log_and_call cb);
-
-let get_usertable
-    (db: Sqlite.t)
-    (id: string)
-    (cb: option (StringMap.t Common.uuidT) => unit) =>
-  Sqlite.get
-    db
-    "SELECT usertable FROM Usertable WHERE id = $id"
-    {"$id": id}
-    (
-      fun _ row =>
-        cb (
-          switch (Js.Undefined.to_opt row) {
-          | None => None
-          | Some row => Some (Persist.from_string row##usertable)
-          }
-        )
-    );
-
-let get_stdlib_usertable
-    db
-    id
-    ::symbolTable
-    ::uuidToNodeMap
-    (cb: (StringMap.t Common.uuidT, StringMap.t AST.astNodeT) => unit) =>
-  get_usertable
-    db
-    id
-    (
-      fun maybeTable =>
-        switch maybeTable {
-        | Some x => cb (x, uuidToNodeMap)
-        | None =>
-          /* print_endline (creating ) */
-          let state = {
-            Common.EvalState.symbolTable: symbolTable,
-            uuidToNodeMap,
-            userTable: StringMap.empty,
-            addedUuids: []
-          };
-          switch (Parse.Parser.parse_single "(load \"std\")") {
-          | Ok e =>
-            Eval.eval
-              e
-              ctx::(Eval.create_initial_context state)
-              ::state
-              cb::(
-                fun (res, s) =>
-                  switch res {
-                  | Ok _ =>
-                    print_endline "Stdlib autoloaded successfully.";
-                    cb (s.userTable, s.uuidToNodeMap)
-                  | Error _ =>
-                    print_endline (AST.to_string res);
-                    print_endline "Error evaluating stdlib, continuing...";
-                    cb (s.userTable, s.uuidToNodeMap)
-                  }
-              )
-          | Error _ as e =>
-            print_endline (AST.to_string e);
-            print_endline "Error parsing stdlib, continuing...";
-            cb (state.userTable, state.uuidToNodeMap)
-          }
-        }
-    );
-
-let load_uuidmap (db: Sqlite.t) (cb: StringMap.t AST.astNodeT => unit) =>
-  Sqlite.all
-    db
-    "SELECT id, node FROM UuidMap"
-    (Js.Obj.empty ())
-    (
-      fun _ rows =>
-        cb (
-          switch (Js.Undefined.to_opt rows) {
-          | None => StringMap.empty
-          | Some rows =>
-            Array.fold_left
-              (fun map [|k, v|] => StringMap.add k (Persist.from_string v) map)
-              StringMap.empty
-              rows
-          }
-        )
-    );
-
-let ignore_first cb _ => cb ();
-
-let rec insert_multiple
-        db
-        (queries: list (string, Js.t 'a))
-        (cb: unit => unit)
-        () =>
-  switch queries {
-  | [] => cb ()
-  | [(query, params), ...tl] =>
-    Sqlite.run db query params (ignore_first (insert_multiple db tl cb))
-  };
-
-let add_to_uuidmap db addedUuids uuidToNodeMap (cb: unit => unit) => {
-  let queries =
-    List.map
-      (
-        fun uuid =>
-          switch (Common.StringMapHelper.get uuid uuidToNodeMap) {
-          | None => assert false
-          | Some node => (
-              "INSERT INTO UuidMap ('id', 'node') VALUES ($id, $node)",
-              {"$id": uuid, "$node": Persist.to_string node}
-            )
-          }
-      )
-      addedUuids;
-  insert_multiple db queries cb ()
-};
-
 let symbolTable = (Builtins.add_builtins Eval.empty).symbolTable;
 
-let process_input
-    (uuidToNodeMap: StringMap.t AST.astNodeT)
-    ::cb
-    db
-    threadid
-    in_str
-    :unit =>
-  get_stdlib_usertable
+let process_input ::uuidMap ::cb ::db ::threadid ::input :unit =>
+  SqlHelper.get_stdlib_usertable
     db
     threadid
     ::symbolTable
-    ::uuidToNodeMap
+    uuidToNodeMap::uuidMap
     (
       fun (userTable, uuidToNodeMap) => {
         let state = {
@@ -191,7 +22,7 @@ let process_input
           uuidToNodeMap,
           addedUuids: []
         };
-        switch (Parse.Parser.parse_single in_str) {
+        switch (Parse.Parser.parse_single input) {
         | Ok e =>
           Eval.eval
             e
@@ -199,7 +30,7 @@ let process_input
             ::state
             cb::(
               fun (r, s) =>
-                put_usertable
+                SqlHelper.put_usertable
                   db threadid s.userTable (fun _ => cb (r, s.uuidToNodeMap))
             )
         | Error _ as e => cb (e, state.uuidToNodeMap)
@@ -207,40 +38,64 @@ let process_input
       }
     );
 
+Random.self_init ();
+
 let db = Sqlite.database ":memory:";
 
-let split_input: string => (string, string) = [%bs.raw
-  {|
-  function(s) {
-    var firstparen = s.indexOf('(');
-    var firstspace = s.indexOf(' ');
-    if (firstparen == -1 || firstspace == -1 || firstspace > firstparen)
-      return ["debug-", s]
-    else
-      return ["debug-"+s.split(' ')[0], s.split(' ').slice(1).join(' ')]
-  }
-|}
-];
+let creds = ChatApi.parseLoginCreds "login.json";
 
-let rec prompt uuidMap =>
-  Readline.question
-    rl
-    "> "
-    (
-      fun in_str => {
-        let (threadid, body) = split_input in_str;
+let global_uuidmap = ref None;
+
+let listen_cb api _err maybe_msg =>
+  switch (Js.Null.to_opt maybe_msg) {
+  | None => failwith "Error in msg from listen"
+  | Some msg =>
+    let m = ChatApi.getBody msg;
+    let threadid = ChatApi.getThreadID msg;
+    let msgid = ChatApi.getMessageID msg;
+    let (m, quiet) =
+      if (m.[0] == '!' && m.[1] == '(') {
+        (String.sub m 1 (String.length m - 1), false)
+      } else {
+        (m, true)
+      };
+    if (m.[0] == '(' && m.[String.length m - 1] == ')') {
+      switch !global_uuidmap {
+      | None => ChatApi.setMessageReaction api emote::":sad:" id::msgid
+      | Some uuidMap =>
         process_input
-          uuidMap
+          ::uuidMap
+          ::db
+          ::threadid
+          input::m
           cb::(
             fun (result, uuidMap) => {
-              print_endline (AST.to_string result);
-              prompt uuidMap
+              global_uuidmap := Some uuidMap;
+              switch (result, quiet) {
+              | (Error _, false)
+              | (Ok _, _) =>
+                ChatApi.sendMessage
+                  api msg::(AST.to_string result) id::threadid
+              | (Error _, true) =>
+                ChatApi.setMessageReaction api emote::":dislike:" id::msgid
+              }
             }
           )
-          db
-          threadid
-          body
       }
-    );
+    }
+  };
 
-create_tables db (fun _ => load_uuidmap db (fun uuidmap => prompt uuidmap));
+let start uuidmap => {
+  global_uuidmap := Some uuidmap;
+  ChatApi.login
+    creds
+    (
+      fun _ maybe_api =>
+        switch (Js.Null.to_opt maybe_api) {
+        | None => failwith "Could not log in"
+        | Some api => ChatApi.listen api (listen_cb api)
+        }
+    )
+};
+
+SqlHelper.create_tables db (fun _ => SqlHelper.load_uuidmap db start);
