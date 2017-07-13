@@ -50,7 +50,8 @@ module Eval: EvalT = {
   };
 
   /***/
-  let add_to_uuid_map state uuid node => EvalState.add_to_uuidmap node uuid state;
+  let add_to_uuid_map state uuid node =>
+    EvalState.add_to_uuidmap node uuid state;
 
   /***/
   let is_reserved_symbol state ident_name =>
@@ -231,7 +232,8 @@ module Eval: EvalT = {
                 | Error e => cb (AST.create_exception e, state)
                 | Ok arg_map =>
                   let scope_map = StringMap.map wrap_in_uuid scope;
-                  let scope_map = StringMap.add "recur" (AST.Uuid recur) scope_map;
+                  let scope_map =
+                    StringMap.add "recur" (AST.Uuid recur) scope_map;
                   let argsTable = StringMapHelper.union arg_map scope_map;
                   let ctx = {
                     AST.depth: ctx.depth + 1,

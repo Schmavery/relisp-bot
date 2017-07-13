@@ -139,12 +139,6 @@ module AST: AST_Type = {
     | Func funcT
     | NativeFunc nativeFuncRecT
   and evalStateT = EvalState.t astNodeT;
-  /* let gen_uuid () => { */
-  /*   let s4 () => Printf.sprintf "%04x" (Random.int 65536); */
-  /*   s4 () ^ */
-  /*   s4 () ^ */
-  /*   "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 () */
-  /* }; */
   let create_exception text => Error ([], Str text);
   let hash_hashstring s => {
     let hash = ref 0;
@@ -181,9 +175,7 @@ module AST: AST_Type = {
     | List x =>
       "(" ^ (List.map (fun v => to_hashstring v) x |> String.concat " ") ^ ")"
     | Func f => hashstring_of_func f
-    | NativeFunc f =>
-      Js.log f;
-      print_endline "Cannot calculate hash of native func"
+    | NativeFunc _ => failwith "Cannot calculate hash of native func"
     };
   let hash node => hash_hashstring (to_hashstring node); /* todo: make this smaller */
   let rec string_of_func (f: funcT) => {
