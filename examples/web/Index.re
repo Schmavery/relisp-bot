@@ -1,6 +1,6 @@
 open Common;
 
-module Environment: BuiltinFuncs.EnvironmentT = {
+module Environment = {
   module XHR = {
     type t;
     external create : unit => t = "XMLHttpRequest" [@@bs.new];

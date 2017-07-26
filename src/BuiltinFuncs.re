@@ -1,51 +1,11 @@
 open Common;
 
-module type EnvironmentT = {
-  let load_lib: string => cb::(option string => unit) => unit;
-};
-
-module Builtins (Environment: EnvironmentT) => {
+module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
   module Eval = Evaluate.Eval;
-  module AST = Common.AST;
   module Constants = Constants;
   module Parser = Parse.Parser;
-  let received_error ::expected ::args ::name ::state => (
-    AST.create_exception (
-      "Received " ^
-      string_of_int (List.length args) ^
-      " arguments, expected " ^
-      string_of_int expected ^ " in call to '" ^ name ^ "'"
-    ),
-    state
-  );
+  open BuiltinHelper;
   let add_builtins state => {
-    let add_native_lambda
-        (name: string)
-        macro::(is_macro: bool)
-        func
-        state::(state: AST.evalStateT)
-        :AST.evalStateT => {
-      let asyncf
-          (args: list AST.astNodeT)
-          ctx::(ctx: AST.ctxT)
-          state::(state: AST.evalStateT)
-          cb::(
-            cb: (result AST.astNodeT AST.exceptionT, AST.evalStateT) => unit
-          ) =>
-        func args ::ctx ::state |> cb;
-      let node = AST.NativeFunc {func: asyncf, is_macro};
-      Eval.define_native_symbol state name node
-    };
-    let add_native_lambda_async
-        (name: string)
-        macro::(is_macro: bool)
-        (func: AST.nativeFuncT)
-        state::(state: AST.evalStateT)
-        :AST.evalStateT => {
-      let node = AST.NativeFunc {func, is_macro};
-      Eval.define_native_symbol state name node
-    };
-    /* Define Builtins */
     let do_operation
         (op: float => float => float)
         (op_name: string)
@@ -264,7 +224,8 @@ module Builtins (Environment: EnvironmentT) => {
             switch args {
             | [Ident ident, Str _, other]
             | [Ident ident, other] =>
-              let _docs = /* TODO: docs */
+              let _docs =
+                /* TODO: docs */
                 switch args {
                 | [_, Str docs, _] => docs
                 | _ => "No docs."
@@ -531,7 +492,7 @@ module Builtins (Environment: EnvironmentT) => {
               )
             }
         );
-    let rec equal_helper (v1 : AST.astNodeT)  (v2 : AST.astNodeT) =>
+    let rec equal_helper (v1: AST.astNodeT) (v2: AST.astNodeT) =>
       v1 == v2 || (
         switch (v1, v2) {
         | (Ident s1, Ident s2)

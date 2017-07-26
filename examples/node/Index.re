@@ -1,4 +1,4 @@
-module Environment: BuiltinFuncs.EnvironmentT = {
+module Environment = {
   type errorT;
   external readFile :
     string =>

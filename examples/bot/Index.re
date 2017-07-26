@@ -6,9 +6,9 @@ module Builtins = BuiltinFuncs.Builtins BotEnv;
 
 module StringMap = Common.StringMap;
 
-let symbolTable = (Builtins.add_builtins Eval.empty).symbolTable;
+let baseSymbols = Builtins.add_builtins Eval.empty;
 
-let process_input ::uuidMap ::cb ::db ::threadid ::input :unit =>
+let process_input ::uuidMap ::symbolTable ::cb ::db ::threadid ::input :unit =>
   SqlHelper.get_stdlib_usertable
     db
     threadid
@@ -22,6 +22,7 @@ let process_input ::uuidMap ::cb ::db ::threadid ::input :unit =>
           uuidToNodeMap,
           addedUuids: []
         };
+        let state = BotBuiltins.add_threadid_to_builtins threadid state;
         switch (Parse.Parser.parse_single input) {
         | Ok e =>
           Eval.eval
@@ -46,7 +47,7 @@ let creds = ChatApi.parseLoginCreds "login.json";
 
 let global_uuidmap = ref None;
 
-let listen_cb api _err maybe_msg =>
+let listen_cb api symbolTable _err maybe_msg =>
   switch (Js.Null.to_opt maybe_msg) {
   | None => failwith "Error in msg from listen"
   | Some msg =>
@@ -65,6 +66,7 @@ let listen_cb api _err maybe_msg =>
       | Some uuidMap =>
         process_input
           ::uuidMap
+          ::symbolTable
           ::db
           ::threadid
           input::m
@@ -93,7 +95,9 @@ let start uuidmap => {
       fun _ maybe_api =>
         switch (Js.Null.to_opt maybe_api) {
         | None => failwith "Could not log in"
-        | Some api => ChatApi.listen api (listen_cb api)
+        | Some api =>
+          let apiSymbols = (BotBuiltins.add_builtins baseSymbols api).symbolTable;
+          ChatApi.listen api (listen_cb api apiSymbols)
         }
     )
 };
