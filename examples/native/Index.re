@@ -2,7 +2,7 @@ open Common;
 
 open Evaluate;
     /* let read_lib (name: string) ::cb => { */
-    /*   let ic = open_in ("lib/" ^ name ^ ".lib"); */
+    /*   let ic = open_in ("lib/" ^ name ^ ".bot"); */
     /*   let try_read () => */
     /*     try (Some (input_line ic)) { */
     /*     | End_of_file => None */

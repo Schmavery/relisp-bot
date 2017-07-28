@@ -9,5 +9,5 @@ external readFile :
 
 let load_lib filename ::cb =>
   readFile
-    ("stdlib/" ^ filename ^ ".lib")
+    ("stdlib/" ^ filename ^ ".bot")
     (fun _ str => cb (Js.Undefined.to_opt str));

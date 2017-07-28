@@ -28,7 +28,7 @@ module Environment = {
             cb None
           }
       );
-    XHR.open_ xhr "GET" ("stdlib/" ^ filename ^ ".lib");
+    XHR.open_ xhr "GET" ("stdlib/" ^ filename ^ ".bot");
     XHR.send xhr
   };
 };
