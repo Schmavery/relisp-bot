@@ -5,9 +5,13 @@ module type EvalT = {
   let empty: evalStateT;
   let is_macro: astNodeT => bool;
   let create_initial_context: evalStateT => ctxT;
-  let define_native_symbol: evalStateT => string => astNodeT => evalStateT;
-  let define_user_symbol: evalStateT => string => astNodeT => evalStateT;
+  let define_native_symbol:
+    evalStateT => string => docsT => astNodeT => evalStateT;
+  let define_user_symbol:
+    evalStateT => string => docsT => astNodeT => evalStateT;
   let resolve_ident: string => ctxT => evalStateT => option astNodeT;
+  let resolve_ident_with_docs:
+    string => ctxT => evalStateT => option (docsT, astNodeT);
   let is_reserved_symbol: evalStateT => string => bool;
   let add_to_uuid_map: evalStateT => uuidT => astNodeT => evalStateT;
   let eval:
@@ -41,7 +45,7 @@ module Eval: EvalT = {
     | Func f => f.is_macro
     | _ => false
     };
-  let wrap_in_uuid uuid => AST.Uuid uuid;
+  let wrap_in_uuid (docs: docsT, uuid) => (docs, AST.Uuid uuid);
 
   /***/
   let create_initial_context (state: evalStateT) => {
@@ -58,31 +62,53 @@ module Eval: EvalT = {
     StringMapHelper.get ident_name state.EvalState.symbolTable == None;
 
   /***/
-  let define_native_symbol state (ident_name: string) (node: astNodeT) =>
-    EvalState.add_to_symboltable ident_name node state;
+  let define_native_symbol
+      state
+      (ident_name: string)
+      (docs: docsT)
+      (node: astNodeT) =>
+    EvalState.add_to_symboltable ident_name (docs, node) state;
 
   /***/
-  let define_user_symbol state (ident_name: string) (node: astNodeT) => {
+  let define_user_symbol
+      state
+      (ident_name: string)
+      (docs: docsT)
+      (node: astNodeT) => {
     let uuid = AST.hash node;
     let state = EvalState.add_to_uuidmap node uuid state;
-    EvalState.add_to_usertable ident_name uuid state
+    EvalState.add_to_usertable ident_name (docs, uuid) state
   };
 
   /***/
-  let resolve_ident (ident_name: string) (ctx: ctxT) state :option astNodeT =>
+  let resolve_ident_with_docs
+      (ident_name: string)
+      (ctx: ctxT)
+      state
+      :option (docsT, astNodeT) =>
     switch (StringMapHelper.get ident_name state.EvalState.symbolTable) {
-    | Some node => Some node
+    | Some n => Some n
     | None =>
       switch (StringMapHelper.get ident_name ctx.argsTable) {
       | None => None
-      | Some (Node x) => Some x
-      | Some (Uuid x) =>
+      | Some (docs, Node n) => Some (docs, n)
+      | Some (docs, Uuid x) =>
         switch (StringMapHelper.get x state.EvalState.uuidToNodeMap) {
-        | Some x => Some x
+        | Some x => Some (docs, x)
         | None =>
           failwith ("Could not find node " ^ ident_name ^ " in uuidMap")
         }
       }
+    };
+  let resolve_ident (ident_name: string) (ctx: ctxT) state :option astNodeT =>
+    switch (resolve_ident_with_docs ident_name ctx state) {
+    | None => None
+    | Some (_docs, node) => Some node
+    };
+  let resolve_docs (ident_name: string) (ctx: ctxT) state :option docsT =>
+    switch (resolve_ident_with_docs ident_name ctx state) {
+    | None => None
+    | Some (docs, _node) => Some docs
     };
 
   /***/
@@ -233,8 +259,9 @@ module Eval: EvalT = {
                 | Ok arg_map =>
                   let scope_map = StringMap.map wrap_in_uuid scope;
                   let scope_map =
-                    StringMap.add "recur" (AST.Uuid recur) scope_map;
-                  let argsTable = StringMapHelper.union arg_map scope_map;
+                    StringMap.add "recur" (None, AST.Uuid recur) scope_map;
+                  let docarg_map = StringMap.map (fun x => (None, x)) arg_map;
+                  let argsTable = StringMapHelper.union docarg_map scope_map;
                   let ctx = {
                     AST.depth: ctx.depth + 1,
                     AST.argsTable: argsTable

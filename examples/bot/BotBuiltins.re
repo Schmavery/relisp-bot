@@ -13,7 +13,7 @@ let add_builtins state api => {
             switch (
               StringMapHelper.get "THREAD/id" state.EvalState.symbolTable
             ) {
-            | Some (Str threadid) =>
+            | Some (_docs, Str threadid) =>
               ChatApi.getThreadInfo
                 api
                 id::threadid
@@ -87,7 +87,7 @@ let add_builtins state api => {
             switch (
               StringMapHelper.get "THREAD/id" state.EvalState.symbolTable
             ) {
-            | Some (Str threadid) =>
+            | Some (_docs, Str threadid) =>
               ChatApi.getThreadInfo
                 api
                 id::threadid
@@ -175,4 +175,5 @@ let add_builtins state api => {
 };
 
 let add_threadid_to_builtins threadid state =>
-  Evaluate.Eval.define_native_symbol state "THREAD/id" (Str threadid);
+  Evaluate.Eval.define_native_symbol
+    state "THREAD/id" (Some "Id of the current thread.") (Str threadid);

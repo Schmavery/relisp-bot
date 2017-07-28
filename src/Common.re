@@ -4,6 +4,8 @@ type result 'a 'b =
 
 type uuidT = string;
 
+type docsT = option string;
+
 module StringMap = Map.Make String;
 
 module StringMapHelper = {
@@ -29,8 +31,8 @@ module StringMapHelper = {
 
 module EvalState = {
   type t 'a = {
-    userTable: StringMap.t uuidT,
-    symbolTable: StringMap.t 'a,
+    userTable: StringMap.t (docsT, uuidT),
+    symbolTable: StringMap.t (docsT, 'a),
     uuidToNodeMap: StringMap.t 'a,
     addedUuids: list uuidT
   };
@@ -40,11 +42,6 @@ module EvalState = {
     symbolTable: StringMap.empty,
     addedUuids: []
   };
-  let to_string state =>
-    "====state====\nuserTable:\n" ^
-    StringMapHelper.to_string state.userTable ^
-    "-------------\nsymbolTable:\n" ^
-    StringMap.fold (fun k _v a => a ^ k ^ "\n") state.symbolTable "";
   let add_to_uuidmap (node: 'a) (uuid: uuidT) state :t 'a => {
     ...state,
     uuidToNodeMap: StringMap.add uuid node state.uuidToNodeMap,
@@ -70,7 +67,7 @@ module type AST_Type = {
     func: astNodeT,
     args: list string,
     vararg: option string,
-    scope: StringMap.t string,
+    scope: StringMap.t (docsT, string),
     recur: uuidT,
     is_macro: bool
   }
@@ -85,7 +82,7 @@ module type AST_Type = {
     is_macro: bool
   }
   and ctxT = {
-    argsTable: StringMap.t uuidOrNodeT,
+    argsTable: StringMap.t (docsT, uuidOrNodeT),
     depth: int
   }
   and astNodeT =
@@ -111,7 +108,7 @@ module AST: AST_Type = {
     func: astNodeT,
     args: list string,
     vararg: option string,
-    scope: StringMap.t string,
+    scope: StringMap.t (docsT, string),
     recur: uuidT,
     is_macro: bool
   }
@@ -126,7 +123,7 @@ module AST: AST_Type = {
     is_macro: bool
   }
   and ctxT = {
-    argsTable: StringMap.t uuidOrNodeT,
+    argsTable: StringMap.t (docsT, uuidOrNodeT),
     depth: int
   }
   and astNodeT =
@@ -160,7 +157,8 @@ module AST: AST_Type = {
       | None => f.args
       };
     let args = String.concat " " arg_list;
-    let scope_list = StringMap.fold (fun k v a => [k ^ v, ...a]) f.scope [];
+    let scope_list =
+      StringMap.fold (fun k (_d, v) a => [k ^ v, ...a]) f.scope [];
     let scope = String.concat " " scope_list;
     /* Intentionally don't include the recur uuid in hash */
     "(" ^ kind ^ ":" ^ scope ^ ":" ^ args ^ ":" ^ to_hashstring f.func ^ ")"

@@ -16,6 +16,7 @@ let received_error ::expected ::args ::name ::state => (
 
 let add_native_lambda
     (name: string)
+    ::docs=?
     macro::(is_macro: bool)
     func
     state::(state: AST.evalStateT)
@@ -27,15 +28,16 @@ let add_native_lambda
       cb::(cb: (result AST.astNodeT AST.exceptionT, AST.evalStateT) => unit) =>
     func args ::ctx ::state |> cb;
   let node = AST.NativeFunc {func: asyncf, is_macro};
-  Evaluate.Eval.define_native_symbol state name node
+  Evaluate.Eval.define_native_symbol state name docs node
 };
 
 let add_native_lambda_async
     (name: string)
+    ::docs=?
     macro::(is_macro: bool)
     (func: AST.nativeFuncT)
     state::(state: AST.evalStateT)
     :AST.evalStateT => {
   let node = AST.NativeFunc {func, is_macro};
-  Evaluate.Eval.define_native_symbol state name node
+  Evaluate.Eval.define_native_symbol state name docs node
 };

@@ -56,24 +56,24 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
     let state = do_operation ( *. ) "*" state;
     let rec create_lambda_scope
             (node: AST.astNodeT)
-            (map: StringMap.t uuidT)
+            (map: StringMap.t (docsT, uuidT))
             (arg_names: list string)
             (ctx: AST.ctxT)
             (state: AST.evalStateT)
-            :result (StringMap.t uuidT, AST.evalStateT) string =>
+            :result (StringMap.t (docsT, uuidT), AST.evalStateT) string =>
       switch node {
       | Ident i =>
-        switch (Eval.resolve_ident i ctx state) {
+        switch (Eval.resolve_ident_with_docs i ctx state) {
         | None
         /* Don't remember native functions (they're from symboltable)*/
-        | Some (NativeFunc _) => Ok (map, state)
+        | Some (_, NativeFunc _) => Ok (map, state)
         /* TODO: Intelligently parse body to statically check
            for undefined identifiers (idents could be captured by
            another lambda within the body of this lambda) */
-        | Some node =>
+        | Some (docs, node) =>
           let hash = AST.hash node;
           let new_state = Eval.add_to_uuid_map state hash node;
-          Ok (StringMap.add i hash map, new_state)
+          Ok (StringMap.add i (docs, hash) map, new_state)
         }
       | List lst =>
         List.fold_left
@@ -218,17 +218,19 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
       add_native_lambda_async
         ::state
         "define"
+        docs::(
+          "Takes an identifier and a value to be set to that identifier. " ^ "Optionally, a string can be passed in after the identifier to be used as docs."
+        )
         macro::true
         (
           fun args ::ctx ::state cb::return =>
             switch args {
             | [Ident ident, Str _, other]
             | [Ident ident, other] =>
-              let _docs =
-                /* TODO: docs */
+              let docs =
                 switch args {
-                | [_, Str docs, _] => docs
-                | _ => "No docs."
+                | [_, Str docs, _] => Some docs
+                | _ => None
                 };
               if (ctx.depth > 2) {
                 return (
@@ -259,7 +261,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                     | (Ok res, state) =>
                       return (
                         Ok (List []),
-                        Eval.define_user_symbol state ident res
+                        Eval.define_user_symbol state ident docs res
                       )
                     | (Error _, _) as e => return e
                   )
@@ -591,40 +593,64 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             | lst => received_error expected::2 args::lst name::"cons" ::state
             }
         );
+    let state =
+      add_native_lambda
+        ::state
+        "docs"
+        macro::true
+        (
+          fun args ::ctx ::state =>
+            switch args {
+            | [Ident i] =>
+              switch (Evaluate.Eval.resolve_ident_with_docs i ctx state) {
+              | None => (
+                  AST.create_exception ("Undeclared identifier [" ^ i ^ "]."),
+                  state
+                )
+              | Some (None, _) => (Ok (Str "No docs"), state)
+              | Some (Some docs, _) => (Ok (Str docs), state)
+              }
+            | [_] => (
+                AST.create_exception "Expected ident in call to 'docs'",
+                state
+              )
+            | lst => received_error expected::1 args::lst name::"docs" ::state
+            }
+        );
 
     /** Debug functions */
-    let state =
-      add_native_lambda
-        ::state
-        "DEBUG/print-scope"
-        macro::false
-        (
-          fun args ctx::_ ::state =>
-            switch args {
-            | [Func {scope}] =>
-              print_endline (StringMapHelper.to_string scope);
-              (Ok (List []), state)
-            | lst =>
-              received_error
-                expected::1 args::lst name::"DEBUG/print-scope" ::state
-            }
-        );
-    let state =
-      add_native_lambda
-        ::state
-        "DEBUG/print-state"
-        macro::false
-        (
-          fun args ctx::_ ::state =>
-            switch args {
-            | [] =>
-              print_endline (Common.EvalState.to_string state);
-              (Ok (List []), state)
-            | lst =>
-              received_error
-                expected::0 args::lst name::"DEBUG/print-state" ::state
-            }
-        );
+    /* let state = */
+    /*   add_native_lambda */
+    /*     ::state */
+    /*     "DEBUG/print-scope" */
+    /*     macro::false */
+    /*     ( */
+    /*       fun args ctx::_ ::state => */
+    /*         switch args { */
+    /*         | [Func {scope}] => */
+    /*           print_endline (StringMapHelper.to_string scope); */
+    /*           (Ok (List []), state) */
+    /*         | lst => */
+    /*           received_error */
+    /*             expected::1 args::lst name::"DEBUG/print-scope" ::state */
+    /*         } */
+    /*     ); */
+    /* let state = */
+    /*   add_native_lambda */
+    /*     ::state */
+    /*     "DEBUG/print-state" */
+    /*     macro::false */
+    /*     ( */
+    /*       fun args ctx::_ ::state => */
+    /*         switch args { */
+    /*         | [] => */
+    /*           print_endline (Common.EvalState.to_string state); */
+    /*           (Ok (List []), state) */
+    /*         | lst => */
+    /*           received_error */
+    /*             expected::0 args::lst name::"DEBUG/print-state" ::state */
+    /*         } */
+    /*     ); */
     let state =
       add_native_lambda_async
         ::state

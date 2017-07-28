@@ -24,7 +24,7 @@ let create_tables db (cb: Sqlite.err => unit) =>
 let put_usertable
     db
     (id: string)
-    (table: StringMap.t Common.uuidT)
+    (table: StringMap.t (Common.docsT, Common.uuidT))
     (cb: Sqlite.err => unit) =>
   Sqlite.run
     db
@@ -35,7 +35,7 @@ let put_usertable
 let get_usertable
     (db: Sqlite.t)
     (id: string)
-    (cb: option (StringMap.t Common.uuidT) => unit) =>
+    (cb: option (StringMap.t (Common.docsT, Common.uuidT)) => unit) =>
   Sqlite.get
     db
     "SELECT usertable FROM Usertable WHERE id = $id"
@@ -55,7 +55,7 @@ let get_stdlib_usertable
     id
     ::symbolTable
     ::uuidToNodeMap
-    (cb: (StringMap.t Common.uuidT, StringMap.t AST.astNodeT) => unit) =>
+    (cb: (StringMap.t (Common.docsT, Common.uuidT), StringMap.t AST.astNodeT) => unit) =>
   get_usertable
     db
     id
