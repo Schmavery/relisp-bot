@@ -135,11 +135,12 @@ input_element.onkeydown = function (e) {
     ];
     position[0] = 0;
     process_input(state[0], function (param) {
+          var new_state = param[1];
           evaluating[0] = /* false */0;
-          state[0] = param[1];
+          state[0] = new_state;
           input_element.value = "";
           add_console_element("> " + in_str);
-          return add_console_element(Curry._1(Common.AST[/* to_string */2], param[0]));
+          return add_console_element(Curry._2(Common.AST[/* to_string */2], param[0], new_state));
         }, in_str);
     return false;
   }
@@ -1054,7 +1055,7 @@ function Builtins(Environment) {
               exit = 1;
             } else {
               return /* tuple */[
-                      Curry._1(Common.AST[/* create_exception */1], "Expected list in call to 'car', got [" + (Curry._1(Common.AST[/* to_string */2], /* Ok */Block.__(0, [e])) + "] instead.")),
+                      Curry._1(Common.AST[/* create_exception */1], "Expected list in call to 'car', got [" + (Curry._2(Common.AST[/* to_string */2], /* Ok */Block.__(0, [e]), state) + "] instead.")),
                       state
                     ];
             }
@@ -1285,6 +1286,7 @@ function Builtins(Environment) {
                       } else {
                         var args$1 = match$1[1];
                         return Curry._4(Evaluate.Eval[/* eval */9], match$1[0], ctx, initial_state, function (param) {
+                                    var state = param[1];
                                     var evaled_first = param[0];
                                     var exit = 0;
                                     var func;
@@ -1318,14 +1320,14 @@ function Builtins(Environment) {
                                       }
                                       if (exit$1 === 2) {
                                         return Curry._1(cb, /* tuple */[
-                                                    Curry._1(Common.AST[/* create_exception */1], Curry._1(Common.AST[/* to_string */2], evaled_first)),
+                                                    Curry._1(Common.AST[/* create_exception */1], Curry._2(Common.AST[/* to_string */2], evaled_first, state)),
                                                     initial_state
                                                   ]);
                                       }
                                       
                                     }
                                     if (exit === 1) {
-                                      return Curry._6(Evaluate.Eval[/* eval_lambda */10], func, args$1, "expand", ctx, param[1], cb);
+                                      return Curry._6(Evaluate.Eval[/* eval_lambda */10], func, args$1, "expand", ctx, state, cb);
                                     }
                                     
                                   });
@@ -1569,7 +1571,7 @@ function to_hashstring(ast) {
     case 3 : 
         return Pervasives.string_of_bool(ast[0]);
     case 4 : 
-        return "[Ref]";
+        return "[Ref " + (ast[0] + "]");
     case 5 : 
         return "(" + ($$String.concat(" ", List.map(to_hashstring, ast[0])) + ")");
     case 6 : 
@@ -1604,11 +1606,12 @@ function hash(node) {
   return Pervasives.string_of_int(hash$1);
 }
 
-function to_string$1(ast) {
+function to_string$1(ast, state) {
   if (ast.tag) {
     var param = ast[0];
+    var state$1 = state;
     var lst = param[0];
-    return "[Exception of " + (to_string$1(/* Ok */Block.__(0, [param[1]])) + ("]" + (
+    return "[Exception of " + (to_string$1(/* Ok */Block.__(0, [param[1]]), state$1) + ("]" + (
                 List.length(lst) > 0 ? "\nTrace: " + $$String.concat("\n       ", List.rev(lst)) : ""
               )));
   } else {
@@ -1631,21 +1634,35 @@ function to_string$1(ast) {
       case 3 : 
           return Pervasives.string_of_bool(value[0]);
       case 4 : 
-          return "[Ref]";
+          var match = get(value[0], state[/* refMap */3]);
+          var $js;
+          if (match) {
+            var match$1 = get(match[0], state[/* uuidToNodeMap */2]);
+            if (match$1) {
+              var x = match$1[0];
+              $js = x.tag === 4 ? "[Ref]" : to_string$1(/* Ok */Block.__(0, [x]), state);
+            } else {
+              $js = "?";
+            }
+          } else {
+            $js = "?";
+          }
+          return "[Ref " + ($js + "]");
       case 5 : 
           return "(" + ($$String.concat(" ", List.map(function (v) {
-                            return to_string$1(/* Ok */Block.__(0, [v]));
+                            return to_string$1(/* Ok */Block.__(0, [v]), state);
                           }, value[0])) + ")");
       case 6 : 
           var f = value[0];
+          var state$2 = state;
           var kind = f[/* is_macro */5] ? "macro" : "function";
-          var match = f[/* vararg */2];
-          var arg_list = match ? Pervasives.$at(f[/* args */1], /* :: */[
-                  "... " + match[0],
+          var match$2 = f[/* vararg */2];
+          var arg_list = match$2 ? Pervasives.$at(f[/* args */1], /* :: */[
+                  "... " + match$2[0],
                   /* [] */0
                 ]) : f[/* args */1];
           var args = $$String.concat(", ", arg_list);
-          var body = to_string$1(/* Ok */Block.__(0, [f[/* func */0]]));
+          var body = to_string$1(/* Ok */Block.__(0, [f[/* func */0]]), state$2);
           return "[" + (kind + (": " + (args + (" => " + (body + "]")))));
       case 7 : 
           if (value[0][/* is_macro */1] !== 0) {
@@ -1895,7 +1912,7 @@ function $$eval(_original_node, ctx, state, _cb) {
                       }
                       break;
                   default:
-                    var node_str = Curry._1(Common.AST[/* to_string */2], /* Ok */Block.__(0, [func$2]));
+                    var node_str = Curry._2(Common.AST[/* to_string */2], /* Ok */Block.__(0, [func$2]), state);
                     return Curry._1(cb, /* tuple */[
                                 Curry._1(Common.AST[/* create_exception */1], "Trying to call something that isn't a function. [" + (node_str + "]")),
                                 state
@@ -2027,7 +2044,7 @@ function eval_lambda(called_func, args, func_name, ctx, state, cb) {
                           Caml_builtin_exceptions.assert_failure,
                           [
                             "Evaluate.re",
-                            274,
+                            269,
                             19
                           ]
                         ];
