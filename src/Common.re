@@ -4,7 +4,15 @@ type result 'a 'b =
 
 type uuidT = string;
 
+type refIdT = string;
+
 type docsT = option string;
+
+let gen_uuid () => {
+  let s4 () => Printf.sprintf "%04x" (Random.int 65536);
+  s4 () ^
+  s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
+};
 
 module StringMap = Map.Make String;
 
@@ -34,13 +42,19 @@ module EvalState = {
     userTable: StringMap.t (docsT, uuidT),
     symbolTable: StringMap.t (docsT, 'a),
     uuidToNodeMap: StringMap.t 'a,
+    refMap: StringMap.t uuidT,
     addedUuids: list uuidT
   };
   let empty = {
     userTable: StringMap.empty,
     uuidToNodeMap: StringMap.empty,
     symbolTable: StringMap.empty,
+    refMap: StringMap.empty,
     addedUuids: []
+  };
+  let update_ref ref_id new_val state :t 'a => {
+    ...state,
+    refMap: StringMap.add ref_id new_val state.refMap
   };
   let add_to_uuidmap (node: 'a) (uuid: uuidT) state :t 'a => {
     ...state,
@@ -90,13 +104,13 @@ module type AST_Type = {
     | Str string
     | Num float
     | Bool bool
-    | Ref uuidT
+    | Ref refIdT
     | List (list astNodeT)
     | Func funcT
     | NativeFunc nativeFuncRecT;
   let hash: astNodeT => uuidT;
   let create_exception: string => result 'a exceptionT;
-  let to_string: result astNodeT exceptionT => string;
+  let to_string: result astNodeT exceptionT => evalStateT=> string;
 };
 
 module AST: AST_Type = {
@@ -131,7 +145,7 @@ module AST: AST_Type = {
     | Str string
     | Num float
     | Bool bool
-    | Ref uuidT
+    | Ref refIdT
     | List (list astNodeT)
     | Func funcT
     | NativeFunc nativeFuncRecT
@@ -169,14 +183,14 @@ module AST: AST_Type = {
     | Str x => "\"" ^ x ^ "\""
     | Num x => Printf.sprintf "%g" x
     | Bool x => string_of_bool x
-    | Ref _ => "[Ref]"
+    | Ref refId => "[Ref " ^ refId ^ "]"
     | List x =>
       "(" ^ (List.map (fun v => to_hashstring v) x |> String.concat " ") ^ ")"
     | Func f => hashstring_of_func f
     | NativeFunc _ => failwith "Cannot calculate hash of native func"
     };
   let hash node => hash_hashstring (to_hashstring node); /* todo: make this smaller */
-  let rec string_of_func (f: funcT) => {
+  let rec string_of_func (f: funcT) state => {
     let kind =
       if f.is_macro {
         "macro"
@@ -189,12 +203,12 @@ module AST: AST_Type = {
       | None => f.args
       };
     let args = String.concat ", " arg_list;
-    let body = to_string (Ok f.func);
+    let body = to_string (Ok f.func) state;
     "[" ^ kind ^ ": " ^ args ^ " => " ^ body ^ "]"
   }
-  and string_of_exception (lst: list string, node: astNodeT) =>
+  and string_of_exception (lst: list string, node: astNodeT) state =>
     "[Exception of " ^
-    to_string (Ok node) ^
+    to_string (Ok node) state ^
     "]" ^ (
       if (List.length lst > 0) {
         "\nTrace: " ^ String.concat "\n       " (List.rev lst)
@@ -202,7 +216,7 @@ module AST: AST_Type = {
         ""
       }
     )
-  and to_string (ast: result astNodeT exceptionT) :string =>
+  and to_string (ast: result astNodeT exceptionT) (state: evalStateT) :string =>
     switch ast {
     | Ok value =>
       switch value {
@@ -210,15 +224,27 @@ module AST: AST_Type = {
       | Str x => "\"" ^ x ^ "\""
       | Num x => Printf.sprintf "%g" x
       | Bool x => string_of_bool x
-      | Ref _ => "[Ref]"
+      | Ref refId =>
+        "[Ref " ^
+        (
+          switch (StringMapHelper.get refId state.refMap) {
+          | None => "?"
+          | Some uuid =>
+            switch (StringMapHelper.get uuid state.uuidToNodeMap) {
+            | Some (Ref _) => "[Ref]"
+            | Some x => to_string (Ok x) state
+            | None => "?"
+            }
+          }
+        ) ^ "]"
       | List x =>
         "(" ^
-        (List.map (fun v => to_string (Ok v)) x |> String.concat " ") ^ ")"
-      | Func ({is_macro: false} as f) => string_of_func f
-      | Func ({is_macro: true} as f) => string_of_func f
+        (List.map (fun v => to_string (Ok v) state) x |> String.concat " ") ^ ")"
+      | Func ({is_macro: false} as f) => string_of_func f state
+      | Func ({is_macro: true} as f) => string_of_func f state
       | NativeFunc {is_macro: false} => "[Native Function]"
       | NativeFunc {is_macro: true} => "[Native Macro]"
       }
-    | Error ex => string_of_exception ex
+    | Error ex => string_of_exception ex state
     };
 };

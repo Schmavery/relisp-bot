@@ -141,7 +141,7 @@ setOnKeyDown
               state := new_state;
               setValue input_element "";
               add_console_element ("> " ^ in_str);
-              AST.to_string res |> add_console_element
+              AST.to_string res new_state |> add_console_element
             }
           )
           in_str;

@@ -1,10 +1,8 @@
-module AST = Common.AST;
-
 module Eval = Evaluate.Eval;
 
 module Builtins = BuiltinFuncs.Builtins BotEnv;
 
-module StringMap = Common.StringMap;
+open Common;
 
 let log_and_call cb err => {
   if (not (Js.Null.test (Js.Null.return err))) {
@@ -17,14 +15,16 @@ let create_tables db (cb: Sqlite.err => unit) =>
   Sqlite.exec
     db
     (
-      "CREATE TABLE IF NOT EXISTS Usertable (id TEXT NOT NULL PRIMARY KEY, usertable TEXT);" ^ "CREATE TABLE IF NOT EXISTS UuidMap (id TEXT NOT NULL PRIMARY KEY, node TEXT NOT NULL);"
+      "CREATE TABLE IF NOT EXISTS Usertable (id TEXT NOT NULL PRIMARY KEY, usertable TEXT);" ^
+      "CREATE TABLE IF NOT EXISTS UuidMap (id TEXT NOT NULL PRIMARY KEY, node TEXT NOT NULL);" ^
+      "CREATE TABLE IF NOT EXISTS RefMap (refid TEXT NOT NULL PRIMARY KEY, uuid TEXT NOT NULL);" ^ ""
     )
     (log_and_call cb);
 
 let put_usertable
     db
     (id: string)
-    (table: StringMap.t (Common.docsT, Common.uuidT))
+    (table: StringMap.t (docsT, uuidT))
     (cb: Sqlite.err => unit) =>
   Sqlite.run
     db
@@ -35,7 +35,7 @@ let put_usertable
 let get_usertable
     (db: Sqlite.t)
     (id: string)
-    (cb: option (StringMap.t (Common.docsT, Common.uuidT)) => unit) =>
+    (cb: option (StringMap.t (docsT, uuidT)) => unit) =>
   Sqlite.get
     db
     "SELECT usertable FROM Usertable WHERE id = $id"
@@ -55,22 +55,24 @@ let get_stdlib_usertable
     id
     ::symbolTable
     ::uuidToNodeMap
-    (cb: (StringMap.t (Common.docsT, Common.uuidT), StringMap.t AST.astNodeT) => unit) =>
+    ::refMap
+    (cb: AST.evalStateT => unit) =>
   get_usertable
     db
     id
     (
-      fun maybeTable =>
+      fun maybeTable => {
+        let state = {
+          EvalState.symbolTable: symbolTable,
+          uuidToNodeMap,
+          userTable: StringMap.empty,
+          refMap,
+          addedUuids: []
+        };
         switch maybeTable {
-        | Some x => cb (x, uuidToNodeMap)
+        | Some _ => cb state
         | None =>
           /* print_endline (creating ) */
-          let state = {
-            Common.EvalState.symbolTable: symbolTable,
-            uuidToNodeMap,
-            userTable: StringMap.empty,
-            addedUuids: []
-          };
           switch (Parse.Parser.parse_single "(load \"std\")") {
           | Ok e =>
             Eval.eval
@@ -82,25 +84,45 @@ let get_stdlib_usertable
                   switch res {
                   | Ok _ =>
                     print_endline "Stdlib autoloaded successfully.";
-                    cb (s.userTable, s.uuidToNodeMap)
+                    cb s
                   | Error _ =>
-                    print_endline (AST.to_string res);
+                    print_endline (AST.to_string res state);
                     print_endline "Error evaluating stdlib, continuing...";
-                    cb (s.userTable, s.uuidToNodeMap)
+                    cb s
                   }
               )
           | Error _ as e =>
-            print_endline (AST.to_string e);
+            print_endline (AST.to_string e state);
             print_endline "Error parsing stdlib, continuing...";
-            cb (state.userTable, state.uuidToNodeMap)
+            cb state
           }
         }
+      }
     );
 
 let load_uuidmap (db: Sqlite.t) (cb: StringMap.t AST.astNodeT => unit) =>
   Sqlite.all
     db
     "SELECT id, node FROM UuidMap"
+    (Js.Obj.empty ())
+    (
+      fun _ rows =>
+        cb (
+          switch (Js.Undefined.to_opt rows) {
+          | None => StringMap.empty
+          | Some rows =>
+            Array.fold_left
+              (fun map [|k, v|] => StringMap.add k (Persist.from_string v) map)
+              StringMap.empty
+              rows
+          }
+        )
+    );
+
+let load_refmap (db: Sqlite.t) (cb: StringMap.t uuidT => unit) =>
+  Sqlite.all
+    db
+    "SELECT refid, uuid FROM RefMap"
     (Js.Obj.empty ())
     (
       fun _ rows =>
@@ -134,7 +156,7 @@ let add_to_uuidmap db addedUuids uuidToNodeMap (cb: unit => unit) => {
     List.map
       (
         fun uuid =>
-          switch (Common.StringMapHelper.get uuid uuidToNodeMap) {
+          switch (StringMapHelper.get uuid uuidToNodeMap) {
           | None => assert false
           | Some node => (
               "INSERT INTO UuidMap ('id', 'node') VALUES ($id, $node)",

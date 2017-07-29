@@ -105,11 +105,6 @@ module Eval: EvalT = {
     | None => None
     | Some (_docs, node) => Some node
     };
-  let resolve_docs (ident_name: string) (ctx: ctxT) state :option docsT =>
-    switch (resolve_ident_with_docs ident_name ctx state) {
-    | None => None
-    | Some (docs, _node) => Some docs
-    };
 
   /***/
   let rec create_lambda_arg_map
@@ -205,7 +200,7 @@ module Eval: EvalT = {
               /* | Error e => cb (Error e, state) */
               | Error (lst, ex) => cb (Error ([name, ...lst], ex), state)
               | Ok x =>
-                let node_str = AST.to_string (Ok x);
+                let node_str = AST.to_string (Ok x) state;
                 cb (
                   AST.create_exception (
                     "Trying to call something that isn't a function. [" ^

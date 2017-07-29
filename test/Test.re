@@ -12,7 +12,7 @@ module Environment = {
     "" [@@bs.module "fs"];
   let load_lib filename ::cb =>
     readFile
-      ("stdlib/" ^ filename ^ ".lib")
+      ("stdlib/" ^ filename ^ ".bot")
       (fun _ str => cb (Js.Undefined.to_opt str));
 };
 
@@ -131,7 +131,9 @@ let print_succeed s => print_endline (green ^ s ^ endcolor);
 let print_header s => print_endline (underline ^ s ^ endcolor);
 
 let run_parse_test (input, expected) results cb :unit => {
-  let result = Common.AST.to_string (Parse.Parser.parse_single input);
+  let result =
+    Common.AST.to_string
+      (Parse.Parser.parse_single input) Common.EvalState.empty;
   if (result != expected) {
     cb [(input, expected, result), ...results]
   } else {
@@ -154,7 +156,7 @@ let run_eval_test (input, expected) results cb :unit => {
       ::state
       cb::(
         fun (node, _state) => {
-          let result = Common.AST.to_string node;
+          let result = Common.AST.to_string node state;
           if (result != expected) {
             cb [(input, expected, result), ...results]
           } else {
@@ -225,17 +227,16 @@ let run_test_section (section: testSectionT) (numfail, numsuccess) cb => {
     )
 };
 
-let print_summary cb (failed, total) =>
+let print_summary _cb (failed, total) =>
   if (failed == 0) {
-    print_succeed (
-      "\nTotal: All " ^ string_of_int total ^ " tests passed :)"
-    )
+    print_succeed ("\nTotal: All " ^ string_of_int total ^ " tests passed :)")
   } else {
     print_fail (
       "\nTotal: " ^
       string_of_int failed ^
       " out of " ^ string_of_int total ^ " tests failed :("
-    )
+    );
+    assert false;
   };
 
 let run_test_file tests cb =>

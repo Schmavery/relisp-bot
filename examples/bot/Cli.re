@@ -10,6 +10,7 @@ let symbolTable = (Builtins.add_builtins Eval.empty).symbolTable;
 
 let process_input
     (uuidToNodeMap: StringMap.t AST.astNodeT)
+    refMap
     ::cb
     db
     threadid
@@ -20,14 +21,9 @@ let process_input
     threadid
     ::symbolTable
     ::uuidToNodeMap
+    ::refMap
     (
-      fun (userTable, uuidToNodeMap) => {
-        let state = {
-          Common.EvalState.userTable: userTable,
-          symbolTable,
-          uuidToNodeMap,
-          addedUuids: []
-        };
+      fun state =>
         switch (Parse.Parser.parse_single in_str) {
         | Ok e =>
           Eval.eval
@@ -37,11 +33,16 @@ let process_input
             cb::(
               fun (r, s) =>
                 SqlHelper.put_usertable
-                  db threadid s.userTable (fun _ => cb (r, s.uuidToNodeMap))
+                  db
+                  threadid
+                  s.userTable
+                  (
+                    fun _ => cb (AST.to_string r state, s.uuidToNodeMap, refMap)
+                  )
             )
-        | Error _ as e => cb (e, state.uuidToNodeMap)
+        | Error _ as e =>
+          cb (AST.to_string e state, state.uuidToNodeMap, refMap)
         }
-      }
     );
 
 let split_input s => {
@@ -66,7 +67,7 @@ Random.self_init ();
 
 let db = Sqlite.database ":memory:";
 
-let rec prompt uuidMap =>
+let rec prompt uuidMap refMap =>
   Readline.question
     rl
     "> "
@@ -75,10 +76,11 @@ let rec prompt uuidMap =>
         let (threadid, body) = split_input in_str;
         process_input
           uuidMap
+          refMap
           cb::(
-            fun (result, uuidMap) => {
-              print_endline (AST.to_string result);
-              prompt uuidMap
+            fun (result_str, uuidMap, refMap) => {
+              print_endline result_str;
+              prompt uuidMap refMap
             }
           )
           db
@@ -88,4 +90,9 @@ let rec prompt uuidMap =>
     );
 
 SqlHelper.create_tables
-  db (fun _ => SqlHelper.load_uuidmap db (fun uuidmap => prompt uuidmap));
+  db
+  (
+    fun _ =>
+      SqlHelper.load_uuidmap
+        db (fun uuidmap => SqlHelper.load_refmap db (prompt uuidmap))
+  );

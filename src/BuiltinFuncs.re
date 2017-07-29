@@ -550,7 +550,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             | [e] => (
                 AST.create_exception (
                   "Expected list in call to 'car', got [" ^
-                  AST.to_string (Ok e) ^ "] instead."
+                  AST.to_string (Ok e) state ^ "] instead."
                 ),
                 state
               )
@@ -618,6 +618,61 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             }
         );
 
+    /** Refs */
+    let state =
+      add_native_lambda
+        ::state
+        "ref"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [a] =>
+              let hash = AST.hash a;
+              let refId = Common.gen_uuid ();
+              let state = Common.EvalState.add_to_uuidmap a hash state;
+              let state = Common.EvalState.update_ref refId hash state;
+              (Ok (Ref refId), state)
+            | lst => received_error expected::1 args::lst name::"ref" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "set!"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Ref refId, a] =>
+              let hash = AST.hash a;
+              let state = Common.EvalState.add_to_uuidmap a hash state;
+              let state = Common.EvalState.update_ref refId hash state;
+              (Ok (List []), state)
+            | lst => received_error expected::1 args::lst name::"set!" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "deref"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Ref refId] =>
+              (switch (StringMapHelper.get refId state.refMap) {
+              | None => AST.create_exception "Cannot find refID"
+              | Some uuid =>
+                switch (StringMapHelper.get uuid state.uuidToNodeMap) {
+                | Some x => Ok x
+                | None => AST.create_exception "Cannot find uuid"
+                }
+              }, state)
+            | lst => received_error expected::1 args::lst name::"deref" ::state
+            }
+        );
+
     /** Debug functions */
     /* let state = */
     /*   add_native_lambda */
@@ -673,7 +728,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                         func ::args ::ctx func_name::"expand" ::state ::cb
                     | Ok _ as e =>
                       cb (
-                        AST.create_exception (AST.to_string e),
+                        AST.create_exception (AST.to_string e state),
                         initial_state
                       )
                     | Error _ as e => cb (e, initial_state)
