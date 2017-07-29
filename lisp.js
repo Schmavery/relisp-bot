@@ -268,6 +268,13 @@ function Builtins(Environment) {
                         ]]);
             }
             break;
+        case 1 : 
+        case 2 : 
+        case 3 : 
+            return /* Ok */Block.__(0, [/* tuple */[
+                        map,
+                        state
+                      ]]);
         case 5 : 
             return List.fold_left(function (acc, v) {
                         if (acc.tag) {
@@ -280,15 +287,8 @@ function Builtins(Environment) {
                             map,
                             state
                           ]]), node[0]);
-        case 4 : 
-        case 6 : 
-        case 7 : 
-            return /* Error */Block.__(1, ["Found non-literal in lambda body."]);
         default:
-          return /* Ok */Block.__(0, [/* tuple */[
-                      map,
-                      state
-                    ]]);
+          return /* Error */Block.__(1, ["Found non-literal in lambda body."]);
       }
     };
     var parse_lambda_args = function (_args, _acc) {
@@ -1188,6 +1188,90 @@ function Builtins(Environment) {
           }
           
         }, state$18);
+    var state$20 = BuiltinHelper.add_native_lambda("ref", /* None */0, /* false */0, function (args, _, state) {
+          if (args) {
+            if (args[1]) {
+              return BuiltinHelper.received_error(1, args, "ref", state);
+            } else {
+              var a = args[0];
+              var hash = Curry._1(Common.AST[/* hash */0], a);
+              var refId = Common.gen_uuid(/* () */0);
+              var state$1 = Curry._3(Common.EvalState[/* add_to_uuidmap */2], a, hash, state);
+              var state$2 = Curry._3(Common.EvalState[/* update_ref */1], refId, hash, state$1);
+              return /* tuple */[
+                      /* Ok */Block.__(0, [/* Ref */Block.__(4, [refId])]),
+                      state$2
+                    ];
+            }
+          } else {
+            return BuiltinHelper.received_error(1, args, "ref", state);
+          }
+        }, state$19);
+    var state$21 = BuiltinHelper.add_native_lambda("set!", /* None */0, /* false */0, function (args, _, state) {
+          var exit = 0;
+          if (args) {
+            var match = args[0];
+            if (match.tag === 4) {
+              var match$1 = args[1];
+              if (match$1) {
+                if (match$1[1]) {
+                  exit = 1;
+                } else {
+                  var a = match$1[0];
+                  var hash = Curry._1(Common.AST[/* hash */0], a);
+                  var state$1 = Curry._3(Common.EvalState[/* add_to_uuidmap */2], a, hash, state);
+                  var state$2 = Curry._3(Common.EvalState[/* update_ref */1], match[0], hash, state$1);
+                  return /* tuple */[
+                          /* Ok */Block.__(0, [/* List */Block.__(5, [/* [] */0])]),
+                          state$2
+                        ];
+                }
+              } else {
+                exit = 1;
+              }
+            } else {
+              exit = 1;
+            }
+          } else {
+            exit = 1;
+          }
+          if (exit === 1) {
+            return BuiltinHelper.received_error(1, args, "set!", state);
+          }
+          
+        }, state$20);
+    var state$22 = BuiltinHelper.add_native_lambda("deref", /* None */0, /* false */0, function (args, _, state) {
+          var exit = 0;
+          if (args) {
+            var match = args[0];
+            if (match.tag === 4) {
+              if (args[1]) {
+                exit = 1;
+              } else {
+                var match$1 = Curry._2(Common.StringMapHelper[/* get */0], match[0], state[/* refMap */3]);
+                var $js;
+                if (match$1) {
+                  var match$2 = Curry._2(Common.StringMapHelper[/* get */0], match$1[0], state[/* uuidToNodeMap */2]);
+                  $js = match$2 ? /* Ok */Block.__(0, [match$2[0]]) : Curry._1(Common.AST[/* create_exception */1], "Cannot find uuid");
+                } else {
+                  $js = Curry._1(Common.AST[/* create_exception */1], "Cannot find refID");
+                }
+                return /* tuple */[
+                        $js,
+                        state
+                      ];
+              }
+            } else {
+              exit = 1;
+            }
+          } else {
+            exit = 1;
+          }
+          if (exit === 1) {
+            return BuiltinHelper.received_error(1, args, "deref", state);
+          }
+          
+        }, state$21);
     return BuiltinHelper.add_native_lambda_async("DEBUG/expand-macro", /* None */0, /* false */0, function (args, ctx, initial_state, cb) {
                 var exit = 0;
                 if (args) {
@@ -1270,7 +1354,7 @@ function Builtins(Environment) {
                   return Curry._1(cb, BuiltinHelper.received_error(0, args, "DEBUG/expand-macro", initial_state));
                 }
                 
-              }, state$19);
+              }, state$22);
   };
   return /* module */[
           /* Eval */0,
@@ -1334,9 +1418,28 @@ var List        = require("bs-platform/lib/js/list.js");
 var Block       = require("bs-platform/lib/js/block.js");
 var Curry       = require("bs-platform/lib/js/curry.js");
 var Printf      = require("bs-platform/lib/js/printf.js");
+var Random      = require("bs-platform/lib/js/random.js");
 var $$String    = require("bs-platform/lib/js/string.js");
 var Pervasives  = require("bs-platform/lib/js/pervasives.js");
 var Caml_string = require("bs-platform/lib/js/caml_string.js");
+
+function gen_uuid() {
+  var s4 = function () {
+    return Curry._1(Printf.sprintf(/* Format */[
+                    /* Int */Block.__(4, [
+                        /* Int_x */6,
+                        /* Lit_padding */Block.__(0, [
+                            /* Zeros */2,
+                            4
+                          ]),
+                        /* No_precision */0,
+                        /* End_of_format */0
+                      ]),
+                    "%04x"
+                  ]), Random.$$int(65536));
+  };
+  return s4(/* () */0) + (s4(/* () */0) + ("-" + (s4(/* () */0) + ("-" + (s4(/* () */0) + ("-" + (s4(/* () */0) + ("-" + (s4(/* () */0) + (s4(/* () */0) + s4(/* () */0)))))))))));
+}
 
 var StringMap = $$Map.Make([$$String.compare]);
 
@@ -1379,21 +1482,35 @@ var empty_001 = /* symbolTable */StringMap[/* empty */0];
 
 var empty_002 = /* uuidToNodeMap */StringMap[/* empty */0];
 
+var empty_003 = /* refMap */StringMap[/* empty */0];
+
 var empty = /* record */[
   empty_000,
   empty_001,
   empty_002,
+  empty_003,
   /* addedUuids : [] */0
 ];
+
+function update_ref(ref_id, new_val, state) {
+  return /* record */[
+          /* userTable */state[/* userTable */0],
+          /* symbolTable */state[/* symbolTable */1],
+          /* uuidToNodeMap */state[/* uuidToNodeMap */2],
+          /* refMap */Curry._3(StringMap[/* add */3], ref_id, new_val, state[/* refMap */3]),
+          /* addedUuids */state[/* addedUuids */4]
+        ];
+}
 
 function add_to_uuidmap(node, uuid, state) {
   return /* record */[
           /* userTable */state[/* userTable */0],
           /* symbolTable */state[/* symbolTable */1],
           /* uuidToNodeMap */Curry._3(StringMap[/* add */3], uuid, node, state[/* uuidToNodeMap */2]),
+          /* refMap */state[/* refMap */3],
           /* addedUuids : :: */[
             uuid,
-            state[/* addedUuids */3]
+            state[/* addedUuids */4]
           ]
         ];
 }
@@ -1403,7 +1520,8 @@ function add_to_symboltable(ident_name, node, state) {
           /* userTable */state[/* userTable */0],
           /* symbolTable */Curry._3(StringMap[/* add */3], ident_name, node, state[/* symbolTable */1]),
           /* uuidToNodeMap */state[/* uuidToNodeMap */2],
-          /* addedUuids */state[/* addedUuids */3]
+          /* refMap */state[/* refMap */3],
+          /* addedUuids */state[/* addedUuids */4]
         ];
 }
 
@@ -1412,12 +1530,14 @@ function add_to_usertable(ident_name, uuid, state) {
           /* userTable */Curry._3(StringMap[/* add */3], ident_name, uuid, state[/* userTable */0]),
           /* symbolTable */state[/* symbolTable */1],
           /* uuidToNodeMap */state[/* uuidToNodeMap */2],
-          /* addedUuids */state[/* addedUuids */3]
+          /* refMap */state[/* refMap */3],
+          /* addedUuids */state[/* addedUuids */4]
         ];
 }
 
 var EvalState = /* module */[
   /* empty */empty,
+  /* update_ref */update_ref,
   /* add_to_uuidmap */add_to_uuidmap,
   /* add_to_symboltable */add_to_symboltable,
   /* add_to_usertable */add_to_usertable
@@ -1544,13 +1664,14 @@ var AST = /* module */[
   /* to_string */to_string$1
 ];
 
+exports.gen_uuid        = gen_uuid;
 exports.StringMap       = StringMap;
 exports.StringMapHelper = StringMapHelper;
 exports.EvalState       = EvalState;
 exports.AST             = AST;
 /* StringMap Not a pure module */
 
-},{"bs-platform/lib/js/block.js":8,"bs-platform/lib/js/caml_string.js":23,"bs-platform/lib/js/curry.js":29,"bs-platform/lib/js/list.js":34,"bs-platform/lib/js/map.js":35,"bs-platform/lib/js/pervasives.js":37,"bs-platform/lib/js/printf.js":38,"bs-platform/lib/js/string.js":40}],5:[function(require,module,exports){
+},{"bs-platform/lib/js/block.js":8,"bs-platform/lib/js/caml_string.js":23,"bs-platform/lib/js/curry.js":29,"bs-platform/lib/js/list.js":34,"bs-platform/lib/js/map.js":35,"bs-platform/lib/js/pervasives.js":37,"bs-platform/lib/js/printf.js":38,"bs-platform/lib/js/random.js":39,"bs-platform/lib/js/string.js":40}],5:[function(require,module,exports){
 // Generated by BUCKLESCRIPT VERSION 1.7.4, PLEASE EDIT WITH CARE
 'use strict';
 
@@ -1589,7 +1710,7 @@ function create_initial_context(state) {
 }
 
 function add_to_uuid_map(state, uuid, node) {
-  return Curry._3(Common.EvalState[/* add_to_uuidmap */1], node, uuid, state);
+  return Curry._3(Common.EvalState[/* add_to_uuidmap */2], node, uuid, state);
 }
 
 function is_reserved_symbol(state, ident_name) {
@@ -1597,7 +1718,7 @@ function is_reserved_symbol(state, ident_name) {
 }
 
 function define_native_symbol(state, ident_name, docs, node) {
-  return Curry._3(Common.EvalState[/* add_to_symboltable */2], ident_name, /* tuple */[
+  return Curry._3(Common.EvalState[/* add_to_symboltable */3], ident_name, /* tuple */[
               docs,
               node
             ], state);
@@ -1605,8 +1726,8 @@ function define_native_symbol(state, ident_name, docs, node) {
 
 function define_user_symbol(state, ident_name, docs, node) {
   var uuid = Curry._1(Common.AST[/* hash */0], node);
-  var state$1 = Curry._3(Common.EvalState[/* add_to_uuidmap */1], node, uuid, state);
-  return Curry._3(Common.EvalState[/* add_to_usertable */3], ident_name, /* tuple */[
+  var state$1 = Curry._3(Common.EvalState[/* add_to_uuidmap */2], node, uuid, state);
+  return Curry._3(Common.EvalState[/* add_to_usertable */4], ident_name, /* tuple */[
               docs,
               uuid
             ], state$1);
