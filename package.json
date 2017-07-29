@@ -20,7 +20,7 @@
     "pack": "browserify lib/js/examples/web/index.js > assets/lisp.js",
     "server": "browserify lib/js/examples/web/index.js > assets/lisp.js && rsync stdlib/* assets/stdlib/ && http-server assets",
     "cli": "node lib/js/examples/node/index.js",
-    "deploy": "node scripts/deploy-ghpages.js",
+    "deploy": "bsb -make-world && npm run test && browserify lib/js/examples/web/index.js > assets/lisp.js && node scripts/deploy-ghpages.js",
     "test": "node lib/js/test/test.js"
   },
   "devDependencies": {
