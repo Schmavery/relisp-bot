@@ -62,5 +62,11 @@
   "tests": {
     "((lambda (x) (+ x 1)) 1)": "2",
     "((lambda (x n) (x n)) (lambda (x) (+ x 1)) 1)": "2"
+  }},
+  {
+  "name": "handle refs",
+  "type": "eval",
+  "tests": {
+    "((lambda (r) (+ (deref r) 1)) (ref 10))": "11"
   }}
 ]
