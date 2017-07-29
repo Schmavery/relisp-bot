@@ -8,6 +8,13 @@ module StringMap = Common.StringMap;
 
 let symbolTable = (Builtins.add_builtins Eval.empty).symbolTable;
 
+let persist_data db threadid (state: Common.AST.evalStateT) ::cb =>
+  SqlHelper.put_usertable
+    db
+    threadid
+    state.userTable
+    (fun _ => SqlHelper.process_actions ::db ::state cb);
+
 let process_input
     (uuidToNodeMap: StringMap.t AST.astNodeT)
     refMap
@@ -32,12 +39,13 @@ let process_input
             ::state
             cb::(
               fun (r, s) =>
-                SqlHelper.put_usertable
+                persist_data
                   db
                   threadid
-                  s.userTable
-                  (
-                    fun _ => cb (AST.to_string r state, s.uuidToNodeMap, refMap)
+                  s
+                  cb::(
+                    fun _ =>
+                      cb (AST.to_string r state, s.uuidToNodeMap, refMap)
                   )
             )
         | Error _ as e =>

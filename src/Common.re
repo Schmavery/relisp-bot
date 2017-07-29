@@ -38,28 +38,32 @@ module StringMapHelper = {
 };
 
 module EvalState = {
+  type actionT =
+    | AddUuid uuidT
+    | UpdateRef (refIdT, uuidT);
   type t 'a = {
     userTable: StringMap.t (docsT, uuidT),
     symbolTable: StringMap.t (docsT, 'a),
     uuidToNodeMap: StringMap.t 'a,
     refMap: StringMap.t uuidT,
-    addedUuids: list uuidT
+    recentActions: list actionT
   };
   let empty = {
     userTable: StringMap.empty,
     uuidToNodeMap: StringMap.empty,
     symbolTable: StringMap.empty,
     refMap: StringMap.empty,
-    addedUuids: []
+    recentActions: []
   };
   let update_ref ref_id new_val state :t 'a => {
     ...state,
-    refMap: StringMap.add ref_id new_val state.refMap
+    refMap: StringMap.add ref_id new_val state.refMap,
+    recentActions: [UpdateRef (ref_id, new_val), ...state.recentActions]
   };
   let add_to_uuidmap (node: 'a) (uuid: uuidT) state :t 'a => {
     ...state,
     uuidToNodeMap: StringMap.add uuid node state.uuidToNodeMap,
-    addedUuids: [uuid, ...state.addedUuids]
+    recentActions: [AddUuid uuid, ...state.recentActions]
   };
   let add_to_symboltable ident_name node state => {
     ...state,
@@ -110,7 +114,7 @@ module type AST_Type = {
     | NativeFunc nativeFuncRecT;
   let hash: astNodeT => uuidT;
   let create_exception: string => result 'a exceptionT;
-  let to_string: result astNodeT exceptionT => evalStateT=> string;
+  let to_string: result astNodeT exceptionT => evalStateT => string;
 };
 
 module AST: AST_Type = {

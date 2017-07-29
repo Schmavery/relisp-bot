@@ -8,6 +8,13 @@ module StringMap = Common.StringMap;
 
 let baseSymbols = Builtins.add_builtins Eval.empty;
 
+let persist_data db threadid (state: Common.AST.evalStateT) ::cb =>
+  SqlHelper.put_usertable
+    db
+    threadid
+    state.userTable
+    (fun _ => SqlHelper.process_actions ::db ::state cb);
+
 let process_input
     ::uuidMap
     ::refMap
@@ -34,11 +41,11 @@ let process_input
             ::state
             cb::(
               fun (r, s) =>
-                SqlHelper.put_usertable
+                persist_data
                   db
                   threadid
-                  s.userTable
-                  (
+                  s
+                  cb::(
                     fun _ =>
                       cb (
                         r,

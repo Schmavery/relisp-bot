@@ -67,12 +67,11 @@ let get_stdlib_usertable
           uuidToNodeMap,
           userTable: StringMap.empty,
           refMap,
-          addedUuids: []
+          recentActions: []
         };
         switch maybeTable {
         | Some _ => cb state
         | None =>
-          /* print_endline (creating ) */
           switch (Parse.Parser.parse_single "(load \"std\")") {
           | Ok e =>
             Eval.eval
@@ -151,19 +150,29 @@ let rec insert_multiple
     Sqlite.run db query params (ignore_first (insert_multiple db tl cb))
   };
 
-let add_to_uuidmap db addedUuids uuidToNodeMap (cb: unit => unit) => {
+let process_actions
+    ::db
+    state::(state: Common.AST.evalStateT)
+    (cb: unit => unit) => {
   let queries =
     List.map
       (
-        fun uuid =>
-          switch (StringMapHelper.get uuid uuidToNodeMap) {
-          | None => assert false
-          | Some node => (
-              "INSERT INTO UuidMap ('id', 'node') VALUES ($id, $node)",
-              {"$id": uuid, "$node": Persist.to_string node}
+        fun (action: Common.EvalState.actionT) =>
+          switch action {
+          | AddUuid uuid =>
+            switch (StringMapHelper.get uuid state.uuidToNodeMap) {
+            | None => assert false
+            | Some node => (
+                "INSERT INTO UuidMap ('id', 'node') VALUES ($1, $2)",
+                {"$1": uuid, "$2": Persist.to_string node}
+              )
+            }
+          | UpdateRef (refId, uuid) => (
+              "INSERT INTO RefMap ('refid', 'uuid') VALUES ($1, $2)",
+              {"$1": refId, "$2": Persist.to_string uuid}
             )
           }
       )
-      addedUuids;
+      state.recentActions;
   insert_multiple db queries cb ()
 };

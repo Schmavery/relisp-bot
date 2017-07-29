@@ -53,9 +53,9 @@ let rec prompt state =>
       process_input
         state
         cb::(
-          fun (result, state) => {
+          fun (result, state: AST.evalStateT) => {
             print_endline (AST.to_string result state);
-            prompt state
+            prompt {...state, recentActions: []}
           }
         )
     );
@@ -74,7 +74,7 @@ switch (Parse.Parser.parse_single "(load \"std\")") {
         | Ok _ =>
           print_endline "Stdlib autoloaded successfully.";
           prompt s
-        | Error _=>
+        | Error _ =>
           print_endline (AST.to_string res state);
           print_endline "Error evaluating stdlib, continuing...";
           prompt state

@@ -138,7 +138,7 @@ setOnKeyDown
           cb::(
             fun (res, new_state) => {
               evaluating := false;
-              state := new_state;
+              state := {...new_state, recentActions: []};
               setValue input_element "";
               add_console_element ("> " ^ in_str);
               AST.to_string res new_state |> add_console_element
