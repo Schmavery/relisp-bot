@@ -17,7 +17,8 @@ let create_tables db (cb: Sqlite.err => unit) =>
     (
       "CREATE TABLE IF NOT EXISTS Usertable (id TEXT NOT NULL PRIMARY KEY, usertable TEXT);" ^
       "CREATE TABLE IF NOT EXISTS UuidMap (id TEXT NOT NULL PRIMARY KEY, node TEXT NOT NULL);" ^
-      "CREATE TABLE IF NOT EXISTS RefMap (refid TEXT NOT NULL PRIMARY KEY, uuid TEXT NOT NULL);" ^ ""
+      "CREATE TABLE IF NOT EXISTS RefMap (refId TEXT NOT NULL PRIMARY KEY, uuid TEXT NOT NULL);" ^
+      "CREATE TABLE IF NOT EXISTS Listen (threadId TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, pattern TEXT NOT NULL, uuid TEXT NOT NULL);" ^ ""
     )
     (log_and_call cb);
 
@@ -121,7 +122,7 @@ let load_uuidmap (db: Sqlite.t) (cb: StringMap.t AST.astNodeT => unit) =>
 let load_refmap (db: Sqlite.t) (cb: StringMap.t uuidT => unit) =>
   Sqlite.all
     db
-    "SELECT refid, uuid FROM RefMap"
+    "SELECT refId, uuid FROM RefMap"
     (Js.Obj.empty ())
     (
       fun _ rows =>
@@ -130,10 +131,80 @@ let load_refmap (db: Sqlite.t) (cb: StringMap.t uuidT => unit) =>
           | None => StringMap.empty
           | Some rows =>
             Array.fold_left
-              (fun map [|k, v|] => StringMap.add k (Persist.from_string v) map)
+              (fun map [|k, v|] => StringMap.add k v map) StringMap.empty rows
+          }
+        )
+    );
+
+let load_listen
+    (db: Sqlite.t)
+    (cb: StringMap.t (StringMap.t (string, uuidT)) => unit) =>
+  Sqlite.all
+    db
+    "SELECT threadId, name, pattern, uuid FROM RefMap"
+    (Js.Obj.empty ())
+    (
+      fun _ rows =>
+        cb (
+          switch (Js.Undefined.to_opt rows) {
+          | None => StringMap.empty
+          | Some rows =>
+            Array.fold_left
+              (
+                fun map [|threadId, name, pattern, uuid|] =>
+                  Common.StringMapHelper.update_default
+                    threadId
+                    map
+                    default::StringMap.empty
+                    (fun v => StringMap.add name (pattern, uuid) v)
+              )
               StringMap.empty
               rows
           }
+        )
+    );
+
+let add_listen
+    db
+    (listens: StringMap.t (StringMap.t (string, uuidT)))
+    (threadId: string)
+    (name: string)
+    (pattern: string)
+    (uuid: uuidT)
+    (cb: StringMap.t (StringMap.t (string, uuidT)) => unit) =>
+  Sqlite.run
+    db
+    "INSERT INTO Listen ('threadId', 'name', 'pattern', 'uuid') VALUES ($1, $2, $3, $4)"
+    {"$1": threadId, "$2": name, "$3": pattern, "$4": uuid}
+    (
+      fun _ =>
+        cb (
+          Common.StringMapHelper.update_default
+            threadId
+            listens
+            default::StringMap.empty
+            (fun v => StringMap.add name (pattern, uuid) v)
+        )
+    );
+
+let remove_listen
+    db
+    (listens: StringMap.t (StringMap.t (string, uuidT)))
+    (threadId: string)
+    (name: string)
+    (cb: StringMap.t (StringMap.t (string, uuidT)) => unit) =>
+  Sqlite.run
+    db
+    "DELETE FROM Listen WHERE threadId = $1 AND name = $2"
+    {"$1": threadId, "$2": name}
+    (
+      fun _ =>
+        cb (
+          Common.StringMapHelper.update_default
+            threadId
+            listens
+            default::StringMap.empty
+            (fun v => StringMap.remove name v)
         )
     );
 
@@ -168,7 +239,7 @@ let process_actions
               )
             }
           | UpdateRef (refId, uuid) => (
-              "INSERT INTO RefMap ('refid', 'uuid') VALUES ($1, $2)",
+              "INSERT INTO RefMap ('refId', 'uuid') VALUES ($1, $2)",
               {"$1": refId, "$2": Persist.to_string uuid}
             )
           }

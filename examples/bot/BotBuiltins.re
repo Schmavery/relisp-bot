@@ -1,6 +1,17 @@
 open Common;
 
-let add_builtins state api => {
+let add_builtins
+    (state: AST.evalStateT)
+    (db: Sqlite.t)
+    api
+    (listens: ref (StringMap.t (StringMap.t (string, uuidT)))) => {
+  let get_threadid (state: AST.evalStateT) =>
+    switch (StringMapHelper.get "THREAD/id" state.symbolTable) {
+    | Some (_docs, Str threadid) => Some threadid
+    | Some (_, _)
+    | None => None
+    };
+  let id_not_loaded_ex = Common.AST.create_exception "THREAD/id not loaded";
   let state =
     BuiltinHelper.add_native_lambda_async
       "THREAD/names"
@@ -10,10 +21,8 @@ let add_builtins state api => {
         fun args ctx::_ ::state cb::return =>
           switch args {
           | [] =>
-            switch (
-              StringMapHelper.get "THREAD/id" state.EvalState.symbolTable
-            ) {
-            | Some (_docs, Str threadid) =>
+            switch (get_threadid state) {
+            | Some threadid =>
               ChatApi.getThreadInfo
                 api
                 id::threadid
@@ -56,16 +65,7 @@ let add_builtins state api => {
                         )
                     }
                 )
-            | Some _ =>
-              return (
-                Common.AST.create_exception "THREAD/id not string!",
-                state
-              )
-            | None =>
-              return (
-                Common.AST.create_exception "THREAD/id not loaded",
-                state
-              )
+            | None => return (id_not_loaded_ex, state)
             };
             ()
           | _ =>
@@ -84,10 +84,8 @@ let add_builtins state api => {
         fun args ctx::_ ::state cb::return =>
           switch args {
           | [] =>
-            switch (
-              StringMapHelper.get "THREAD/id" state.EvalState.symbolTable
-            ) {
-            | Some (_docs, Str threadid) =>
+            switch (get_threadid state) {
+            | Some threadid =>
               ChatApi.getThreadInfo
                 api
                 id::threadid
@@ -116,16 +114,7 @@ let add_builtins state api => {
                       )
                     }
                 )
-            | Some _ =>
-              return (
-                Common.AST.create_exception "THREAD/id not string!",
-                state
-              )
-            | None =>
-              return (
-                Common.AST.create_exception "THREAD/id not loaded",
-                state
-              )
+            | None => return (id_not_loaded_ex, state)
             };
             ()
           | _ =>
@@ -168,6 +157,119 @@ let add_builtins state api => {
             return (
               BuiltinHelper.received_error
                 expected::2 ::args name::"THREAD/message" ::state
+            )
+          }
+      );
+  let state =
+    BuiltinHelper.add_native_lambda
+      "LISTEN/list"
+      ::state
+      macro::false
+      (
+        fun args ctx::_ ::state =>
+          switch args {
+          | [] =>
+            switch (get_threadid state) {
+            | Some threadid =>
+              let patterns =
+                StringMapHelper.get_default threadid !listens StringMap.empty;
+              (
+                Ok (
+                  List (
+                    StringMap.fold
+                      (
+                        fun name (pattern, _uuid) lst => [
+                          AST.List [Str name, Str pattern],
+                          ...lst
+                        ]
+                      )
+                      patterns
+                      []
+                  )
+                ),
+                state
+              )
+            | None => (id_not_loaded_ex, state)
+            }
+          | _ =>
+            BuiltinHelper.received_error
+              expected::1 ::args name::"LISTEN/list" ::state
+          }
+      );
+  let state =
+    BuiltinHelper.add_native_lambda_async
+      "LISTEN/add"
+      ::state
+      macro::false
+      (
+        fun args ctx::_ ::state cb::return =>
+          switch args {
+          | [Str name, Str pattern, Func _ as f]
+          | [Str name, Str pattern, NativeFunc _ as f] =>
+            switch (get_threadid state) {
+            | Some threadid =>
+              let hash = Common.AST.hash f;
+              let state = Common.EvalState.add_to_uuidmap f hash state;
+              SqlHelper.add_listen
+                db
+                !listens
+                threadid
+                name
+                pattern
+                hash
+                (
+                  fun new_listens => {
+                    listens := new_listens;
+                    return (Ok (List []), state)
+                  }
+                )
+            | None => return (id_not_loaded_ex, state)
+            }
+          | [_, _, _] =>
+            return (
+              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to LISTEN/add.",
+              state
+            )
+          | _ =>
+            return (
+              BuiltinHelper.received_error
+                expected::1 ::args name::"LISTEN/add" ::state
+            )
+          }
+      );
+  let state =
+    BuiltinHelper.add_native_lambda_async
+      "LISTEN/remove"
+      ::state
+      macro::false
+      (
+        fun args ctx::_ ::state cb::return =>
+          switch args {
+          | [Str name] =>
+            switch (get_threadid state) {
+            | Some threadid =>
+              SqlHelper.remove_listen
+                db
+                !listens
+                threadid
+                name
+                (
+                  fun new_listens => {
+                    listens := new_listens;
+                    return (Ok (List []), state)
+                  }
+                )
+            | None => return (id_not_loaded_ex, state)
+            }
+          | [_, _, _] =>
+            return (
+              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to LISTEN/add.",
+              state
+            )
+          | _ =>
+            return (
+              BuiltinHelper.received_error
+                expected::1 ::args name::"LISTEN/remove" ::state
             )
           }
       );

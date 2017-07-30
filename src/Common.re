@@ -21,6 +21,17 @@ module StringMapHelper = {
     try (Some (StringMap.find key map)) {
     | _ => None
     };
+  let get_default key map default =>
+    try (StringMap.find key map) {
+    | _ => default
+    };
+  let update_default key map ::default update => {
+    let curr_v =
+      try (StringMap.find key map) {
+      | _ => default
+      };
+    StringMap.add key (update curr_v) map
+  };
   let union m1 m2 =>
     StringMap.merge
       (

@@ -33,7 +33,7 @@ external sendMessageCb :
   id::string =>
   (errT => Js.Null.t sendMsgInfoT => unit) =>
   unit =
-  "" [@@bs.send];
+  "sendMessage" [@@bs.send];
 
 external listen : t => (errT => Js.Null.t listenMsgT => unit) => unit =
   "" [@@bs.send];
@@ -63,5 +63,5 @@ external getName : userInfoT => string = "name" [@@bs.get];
 
 /* Helpers */
 let unwrapUserInfo: userInfosT => array userInfoT = [%bs.raw
-  {|function(i){Object.keys(i).map(k => i[k])}|}
+  {|function(i){return Object.keys(i).map(k => i[k])}|}
 ];
