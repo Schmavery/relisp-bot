@@ -97,11 +97,11 @@ setMonospaced input_element;
 setMonospaced console_element;
 
 let add_console_element inner_text => {
+  let pre_node = createElement "pre";
   let new_node = createElement "div";
-  let inner_text = replace inner_text (regexp "\n" "g") "<br>";
-  let inner_text = replace inner_text (regexp " " "g") "&nbsp;";
   setInnerHtml new_node inner_text;
-  appendChild console_element new_node;
+  appendChild pre_node new_node;
+  appendChild console_element pre_node;
   scroll_bottom console_element
 };
 
