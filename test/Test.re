@@ -132,7 +132,7 @@ let print_header s => print_endline (underline ^ s ^ endcolor);
 
 let run_parse_test (input, expected) results cb :unit => {
   let result =
-    Common.AST.to_string
+    Stringify.string_of_ast
       (Parse.Parser.parse_single input) Common.EvalState.empty;
   if (result != expected) {
     cb [(input, expected, result), ...results]
@@ -156,7 +156,7 @@ let run_eval_test (input, expected) results cb :unit => {
       ::state
       cb::(
         fun (node, _state) => {
-          let result = Common.AST.to_string node state;
+          let result = Stringify.string_of_ast node state;
           if (result != expected) {
             cb [(input, expected, result), ...results]
           } else {

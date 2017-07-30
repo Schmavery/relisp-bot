@@ -45,11 +45,11 @@ let process_input
                   s
                   cb::(
                     fun _ =>
-                      cb (AST.to_string r state, s.uuidToNodeMap, refMap)
+                      cb (Stringify.string_of_ast r state, s.uuidToNodeMap, refMap)
                   )
             )
         | Error _ as e =>
-          cb (AST.to_string e state, state.uuidToNodeMap, refMap)
+          cb (Stringify.string_of_ast e state, state.uuidToNodeMap, refMap)
         }
     );
 

@@ -208,7 +208,7 @@ let add_builtins
           | [Str name, Str pattern, NativeFunc _ as f] =>
             switch (get_threadid state) {
             | Some threadid =>
-              let hash = Common.AST.hash f;
+              let hash = Hash.hash f;
               let state = Common.EvalState.add_to_uuidmap f hash state;
               SqlHelper.add_listen
                 db

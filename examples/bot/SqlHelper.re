@@ -86,13 +86,13 @@ let get_stdlib_usertable
                     print_endline "Stdlib autoloaded successfully.";
                     cb s
                   | Error _ =>
-                    print_endline (AST.to_string res state);
+                    print_endline (Stringify.string_of_ast res state);
                     print_endline "Error evaluating stdlib, continuing...";
                     cb s
                   }
               )
           | Error _ as e =>
-            print_endline (AST.to_string e state);
+            print_endline (Stringify.string_of_ast e state);
             print_endline "Error parsing stdlib, continuing...";
             cb state
           }

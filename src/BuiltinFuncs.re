@@ -71,7 +71,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
            for undefined identifiers (idents could be captured by
            another lambda within the body of this lambda) */
         | Some (docs, node) =>
-          let hash = AST.hash node;
+          let hash = Hash.hash node;
           let new_state = Eval.add_to_uuid_map state hash node;
           Ok (StringMap.add i (docs, hash) map, new_state)
         }
@@ -129,7 +129,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 vararg,
                 recur: "dummy"
               };
-            let hash = AST.hash node_dummy;
+            let hash = Hash.hash node_dummy;
             let node =
               AST.Func {
                 func: body,
@@ -550,7 +550,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             | [e] => (
                 AST.create_exception (
                   "Expected list in call to 'car', got [" ^
-                  AST.to_string (Ok e) state ^ "] instead."
+                  Stringify.string_of_ast (Ok e) state ^ "] instead."
                 ),
                 state
               )
@@ -628,7 +628,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [a] =>
-              let hash = AST.hash a;
+              let hash = Hash.hash a;
               let refId = Common.gen_uuid ();
               let state = Common.EvalState.add_to_uuidmap a hash state;
               let state = Common.EvalState.update_ref refId hash state;
@@ -645,7 +645,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [Ref refId, a] =>
-              let hash = AST.hash a;
+              let hash = Hash.hash a;
               let state = Common.EvalState.add_to_uuidmap a hash state;
               let state = Common.EvalState.update_ref refId hash state;
               (Ok (List []), state)
@@ -660,16 +660,80 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
         (
           fun args ctx::_ ::state =>
             switch args {
-            | [Ref refId] =>
-              (switch (StringMapHelper.get refId state.refMap) {
-              | None => AST.create_exception "Cannot find refID"
-              | Some uuid =>
-                switch (StringMapHelper.get uuid state.uuidToNodeMap) {
-                | Some x => Ok x
-                | None => AST.create_exception "Cannot find uuid"
-                }
-              }, state)
+            | [Ref refId] => (
+                switch (StringMapHelper.get refId state.refMap) {
+                | None => AST.create_exception "Cannot find refID"
+                | Some uuid =>
+                  switch (StringMapHelper.get uuid state.uuidToNodeMap) {
+                  | Some x => Ok x
+                  | None => AST.create_exception "Cannot find uuid"
+                  }
+                },
+                state
+              )
             | lst => received_error expected::1 args::lst name::"deref" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "Map.make"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [] => (Ok (Map ASTMap.empty), state)
+            | lst =>
+              received_error expected::0 args::lst name::"Map.make" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "Map.get"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Map map, key] =>
+              switch (ASTMap.find key map) {
+              | v => (Ok v, state)
+              | exception _ => (
+                  AST.create_exception (
+                    "Could not find key: " ^
+                    Stringify.string_of_ast (Ok key) state
+                  ),
+                  state
+                )
+              }
+            | lst =>
+              received_error expected::2 args::lst name::"Map.get" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "Map.add"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Map map, key, v] => (Ok (Map (ASTMap.add key v map)), state)
+            | lst =>
+              received_error expected::3 args::lst name::"Map.add" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "Map.remove"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Map map, key] => (Ok (Map (ASTMap.remove key map)), state)
+            | lst =>
+              received_error expected::2 args::lst name::"Map.remove" ::state
             }
         );
 
@@ -728,7 +792,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                         func ::args ::ctx func_name::"expand" ::state ::cb
                     | Ok _ as e =>
                       cb (
-                        AST.create_exception (AST.to_string e state),
+                        AST.create_exception (Stringify.string_of_ast e state),
                         initial_state
                       )
                     | Error _ as e => cb (e, initial_state)

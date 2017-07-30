@@ -75,7 +75,7 @@ module Eval: EvalT = {
       (ident_name: string)
       (docs: docsT)
       (node: astNodeT) => {
-    let uuid = AST.hash node;
+    let uuid = Hash.hash node;
     let state = EvalState.add_to_uuidmap node uuid state;
     EvalState.add_to_usertable ident_name (docs, uuid) state
   };
@@ -200,7 +200,7 @@ module Eval: EvalT = {
               /* | Error e => cb (Error e, state) */
               | Error (lst, ex) => cb (Error ([name, ...lst], ex), state)
               | Ok x =>
-                let node_str = AST.to_string (Ok x) state;
+                let node_str = Stringify.string_of_ast (Ok x) state;
                 cb (
                   AST.create_exception (
                     "Trying to call something that isn't a function. [" ^

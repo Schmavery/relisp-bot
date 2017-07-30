@@ -87,6 +87,7 @@ module EvalState = {
 };
 
 module type AST_Type = {
+  type astMapT 'a;
   type evalStateT = EvalState.t astNodeT
   and uuidOrNodeT =
     | Uuid uuidT
@@ -121,14 +122,14 @@ module type AST_Type = {
     | Bool bool
     | Ref refIdT
     | List (list astNodeT)
+    | Map (astMapT astNodeT)
     | Func funcT
     | NativeFunc nativeFuncRecT;
-  let hash: astNodeT => uuidT;
   let create_exception: string => result 'a exceptionT;
-  let to_string: result astNodeT exceptionT => evalStateT => string;
 };
 
-module AST: AST_Type = {
+module ASTFunc (ASTMap: Map.S) => {
+  type astMapT 'a = ASTMap.t 'a;
   type exceptionT = (list string, astNodeT)
   and uuidOrNodeT =
     | Uuid uuidT
@@ -162,104 +163,16 @@ module AST: AST_Type = {
     | Bool bool
     | Ref refIdT
     | List (list astNodeT)
+    | Map (astMapT astNodeT)
     | Func funcT
     | NativeFunc nativeFuncRecT
   and evalStateT = EvalState.t astNodeT;
   let create_exception text => Error ([], Str text);
-  let hash_hashstring s => {
-    let hash = ref 0;
-    for i in 0 to (String.length s - 1) {
-      hash := !hash lsl 5 - !hash + Char.code s.[i]
-    };
-    string_of_int !hash
-  };
-  let rec hashstring_of_func (f: funcT) => {
-    let kind =
-      if f.is_macro {
-        "macro"
-      } else {
-        "function"
-      };
-    let arg_list =
-      switch f.vararg {
-      | Some vararg_name => f.args @ ["... " ^ vararg_name]
-      | None => f.args
-      };
-    let args = String.concat " " arg_list;
-    let scope_list =
-      StringMap.fold (fun k (_d, v) a => [k ^ v, ...a]) f.scope [];
-    let scope = String.concat " " scope_list;
-    /* Intentionally don't include the recur uuid in hash */
-    "(" ^ kind ^ ":" ^ scope ^ ":" ^ args ^ ":" ^ to_hashstring f.func ^ ")"
-  }
-  and to_hashstring (ast: astNodeT) :string =>
-    switch ast {
-    | Ident x => x
-    | Str x => "\"" ^ x ^ "\""
-    | Num x => Printf.sprintf "%g" x
-    | Bool x => string_of_bool x
-    | Ref refId => "[Ref " ^ refId ^ "]"
-    | List x =>
-      "(" ^ (List.map (fun v => to_hashstring v) x |> String.concat " ") ^ ")"
-    | Func f => hashstring_of_func f
-    | NativeFunc _ => failwith "Cannot calculate hash of native func"
-    };
-  let hash node => hash_hashstring (to_hashstring node); /* todo: make this smaller */
-  let rec string_of_func (f: funcT) state => {
-    let kind =
-      if f.is_macro {
-        "macro"
-      } else {
-        "function"
-      };
-    let arg_list =
-      switch f.vararg {
-      | Some vararg_name => f.args @ ["... " ^ vararg_name]
-      | None => f.args
-      };
-    let args = String.concat ", " arg_list;
-    let body = to_string (Ok f.func) state;
-    "[" ^ kind ^ ": " ^ args ^ " => " ^ body ^ "]"
-  }
-  and string_of_exception (lst: list string, node: astNodeT) state =>
-    "[Exception of " ^
-    to_string (Ok node) state ^
-    "]" ^ (
-      if (List.length lst > 0) {
-        "\nTrace: " ^ String.concat "\n       " (List.rev lst)
-      } else {
-        ""
-      }
-    )
-  and to_string (ast: result astNodeT exceptionT) (state: evalStateT) :string =>
-    switch ast {
-    | Ok value =>
-      switch value {
-      | Ident x => x
-      | Str x => "\"" ^ x ^ "\""
-      | Num x => Printf.sprintf "%g" x
-      | Bool x => string_of_bool x
-      | Ref refId =>
-        "[Ref " ^
-        (
-          switch (StringMapHelper.get refId state.refMap) {
-          | None => "?"
-          | Some uuid =>
-            switch (StringMapHelper.get uuid state.uuidToNodeMap) {
-            | Some (Ref _) => "[Ref]"
-            | Some x => to_string (Ok x) state
-            | None => "?"
-            }
-          }
-        ) ^ "]"
-      | List x =>
-        "(" ^
-        (List.map (fun v => to_string (Ok v) state) x |> String.concat " ") ^ ")"
-      | Func ({is_macro: false} as f) => string_of_func f state
-      | Func ({is_macro: true} as f) => string_of_func f state
-      | NativeFunc {is_macro: false} => "[Native Function]"
-      | NativeFunc {is_macro: true} => "[Native Macro]"
-      }
-    | Error ex => string_of_exception ex state
-    };
 };
+
+module rec AST: AST_Type with type astMapT 'a = ASTMap.t 'a = ASTFunc ASTMap
+and ASTMap: Map.S with type key = AST.astNodeT =
+  Map.Make {
+    type t = AST.astNodeT;
+    let compare = compare;
+  };

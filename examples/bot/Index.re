@@ -52,11 +52,11 @@ let process_input ::state ::cb ::threadid ::input :unit =>
             s
             cb::(
               fun _ =>
-                cb (r, AST.to_string r state, (s.uuidToNodeMap, s.refMap))
+                cb (r, Stringify.string_of_ast r state, (s.uuidToNodeMap, s.refMap))
             )
       )
   | Error _ as e =>
-    cb (e, AST.to_string e state, (state.uuidToNodeMap, state.refMap))
+    cb (e, Stringify.string_of_ast e state, (state.uuidToNodeMap, state.refMap))
   };
 
 Random.self_init ();
