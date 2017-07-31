@@ -62,17 +62,24 @@ let get_stdlib_usertable
     db
     id
     (
-      fun maybeTable => {
-        let state = {
-          EvalState.symbolTable: symbolTable,
-          uuidToNodeMap,
-          userTable: StringMap.empty,
-          refMap,
-          recentActions: []
-        };
+      fun maybeTable =>
         switch maybeTable {
-        | Some _ => cb state
+        | Some userTable =>
+          cb {
+            EvalState.symbolTable: symbolTable,
+            uuidToNodeMap,
+            userTable,
+            refMap,
+            recentActions: []
+          }
         | None =>
+          let state = {
+            EvalState.symbolTable: symbolTable,
+            uuidToNodeMap,
+            userTable: StringMap.empty,
+            refMap,
+            recentActions: []
+          };
           switch (Parse.Parser.parse_single "(load \"std\")") {
           | Ok e =>
             Eval.eval
@@ -97,7 +104,6 @@ let get_stdlib_usertable
             cb state
           }
         }
-      }
     );
 
 let load_uuidmap (db: Sqlite.t) (cb: StringMap.t AST.astNodeT => unit) =>

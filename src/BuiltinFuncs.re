@@ -754,22 +754,22 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
     /*             expected::1 args::lst name::"DEBUG/print-scope" ::state */
     /*         } */
     /*     ); */
-    /* let state = */
-    /*   add_native_lambda */
-    /*     ::state */
-    /*     "DEBUG/print-state" */
-    /*     macro::false */
-    /*     ( */
-    /*       fun args ctx::_ ::state => */
-    /*         switch args { */
-    /*         | [] => */
-    /*           print_endline (Common.EvalState.to_string state); */
-    /*           (Ok (List []), state) */
-    /*         | lst => */
-    /*           received_error */
-    /*             expected::0 args::lst name::"DEBUG/print-state" ::state */
-    /*         } */
-    /*     ); */
+    let state =
+      add_native_lambda
+        ::state
+        "DEBUG/print-state"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [] =>
+              print_endline (Common.EvalState.to_string state);
+              (Ok (List []), state)
+            | lst =>
+              received_error
+                expected::0 args::lst name::"DEBUG/print-state" ::state
+            }
+        );
     let state =
       add_native_lambda_async
         ::state

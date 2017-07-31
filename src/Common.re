@@ -84,6 +84,10 @@ module EvalState = {
     ...state,
     userTable: StringMap.add ident_name uuid state.userTable
   };
+  let to_string state =>
+    "UserTable:" ^
+    StringMap.fold
+      (fun k (_d, v) a => a ^ k ^ ":\t" ^ v ^ "\n") state.userTable "";
 };
 
 module type AST_Type = {

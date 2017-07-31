@@ -16,12 +16,13 @@ let baseSymbols = Builtins.add_builtins Eval.empty;
 
 let db = Sqlite.database ":memory:";
 
-let persist_data db threadid (state: Common.AST.evalStateT) ::cb =>
+let persist_data db threadid (state: Common.AST.evalStateT) ::cb => {
   SqlHelper.put_usertable
     db
     threadid
     state.userTable
-    (fun _ => SqlHelper.process_actions ::db ::state cb);
+    (fun _ => SqlHelper.process_actions ::db ::state cb)
+};
 
 let build_state ::uuidMap ::refMap ::symbolTable ::threadid ::cb =>
   SqlHelper.get_stdlib_usertable
@@ -45,18 +46,35 @@ let process_input ::state ::cb ::threadid ::input :unit =>
       ctx::(Eval.create_initial_context state)
       ::state
       cb::(
-        fun (r, s) =>
-          persist_data
-            db
-            threadid
-            s
-            cb::(
-              fun _ =>
-                cb (r, Stringify.string_of_ast r state, (s.uuidToNodeMap, s.refMap))
+        fun (r, state) =>
+          switch r {
+          | Error _ =>
+            cb (
+              r,
+              Stringify.string_of_ast r state,
+              (state.uuidToNodeMap, state.refMap)
             )
+          | Ok _ =>
+            persist_data
+              db
+              threadid
+              state
+              cb::(
+                fun _ =>
+                  cb (
+                    r,
+                    Stringify.string_of_ast r state,
+                    (state.uuidToNodeMap, state.refMap)
+                  )
+              )
+          }
       )
   | Error _ as e =>
-    cb (e, Stringify.string_of_ast e state, (state.uuidToNodeMap, state.refMap))
+    cb (
+      e,
+      Stringify.string_of_ast e state,
+      (state.uuidToNodeMap, state.refMap)
+    )
   };
 
 Random.self_init ();
@@ -95,16 +113,16 @@ let rec process_listens
 let listen_cb api symbolTable _err maybe_msg =>
   switch (Js.Null.to_opt maybe_msg, !global_data) {
   | (None, _) => failwith "Error in msg from listen"
-  | (_, None) => () /* TODO: queuing */
+  | (_, None) => print_endline "Too busy"; () /* TODO: queuing */
   | (Some msg, Some (uuidMap, refMap)) =>
-    let m = ChatApi.getBody msg;
+    let msg_body = ChatApi.getBody msg;
     let threadid = ChatApi.getThreadID msg;
     let msgid = ChatApi.getMessageID msg;
     let (m, quiet) =
-      if (m.[0] == '!' && m.[1] == '(') {
-        (String.sub m 1 (String.length m - 1), false)
+      if (msg_body.[0] == '!' && msg_body.[1] == '(') {
+        (String.sub msg_body 1 (String.length msg_body - 1), false)
       } else {
-        (m, true)
+        (msg_body, true)
       };
     if (m.[0] == '(' && m.[String.length m - 1] == ')') {
       build_state
@@ -134,7 +152,7 @@ let listen_cb api symbolTable _err maybe_msg =>
     } else {
       let matching =
         List.filter
-          (fun (_, (pattern, _)) => Regex.test (Regex.create pattern) m)
+          (fun (_, (pattern, _)) => Regex.test (Regex.create pattern) msg_body)
           (
             StringMap.bindings (
               Common.StringMapHelper.get_default
@@ -152,7 +170,7 @@ let listen_cb api symbolTable _err maybe_msg =>
           cb::(
             fun state =>
               process_listens
-                msg::m
+                msg::msg_body
                 ::threadid
                 matching
                 state
