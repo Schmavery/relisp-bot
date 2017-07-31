@@ -2,7 +2,6 @@ open Common;
 
 module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
   module Eval = Evaluate.Eval;
-  module Constants = Constants;
   module Parser = Parse.Parser;
   open BuiltinHelper;
   let add_builtins state => {

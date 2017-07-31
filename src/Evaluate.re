@@ -33,7 +33,6 @@ module type EvalT = {
 module Eval: EvalT = {
   module AST = Common.AST;
   module EvalState = Common.EvalState;
-  module Constants = Constants;
   type evalStateT = AST.evalStateT;
   type ctxT = AST.ctxT;
   type astNodeT = AST.astNodeT;
