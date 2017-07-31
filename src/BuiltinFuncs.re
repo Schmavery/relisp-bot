@@ -756,7 +756,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
     let state =
       add_native_lambda
         ::state
-        "DEBUG/print-state"
+        "Debug.print-state"
         macro::false
         (
           fun args ctx::_ ::state =>
@@ -766,13 +766,13 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
               (Ok (List []), state)
             | lst =>
               received_error
-                expected::0 args::lst name::"DEBUG/print-state" ::state
+                expected::0 args::lst name::"Debug.print-state" ::state
             }
         );
     let state =
       add_native_lambda_async
         ::state
-        "DEBUG/expand-macro"
+        "Debug.expand-macro"
         macro::false
         (
           fun args ::ctx state::initial_state ::cb =>
@@ -799,7 +799,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 )
             | [_] =>
               cb (
-                AST.create_exception "Expected list in call to 'DEBUG/expand-macro",
+                AST.create_exception "Expected list in call to 'Debug.expand-macro",
                 initial_state
               )
             | lst =>
@@ -807,7 +807,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 received_error
                   expected::0
                   args::lst
-                  name::"DEBUG/expand-macro"
+                  name::"Debug.expand-macro"
                   state::initial_state
               )
             }

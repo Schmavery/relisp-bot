@@ -6,15 +6,15 @@ let add_builtins
     api
     (listens: ref (StringMap.t (StringMap.t (string, uuidT)))) => {
   let get_threadid (state: AST.evalStateT) =>
-    switch (StringMapHelper.get "THREAD/id" state.symbolTable) {
+    switch (StringMapHelper.get "Thread.id" state.symbolTable) {
     | Some (_docs, Str threadid) => Some threadid
     | Some (_, _)
     | None => None
     };
-  let id_not_loaded_ex = Common.AST.create_exception "THREAD/id not loaded";
+  let id_not_loaded_ex = Common.AST.create_exception "Thread.id not loaded";
   let state =
     BuiltinHelper.add_native_lambda_async
-      "THREAD/names"
+      "Thread.names"
       ::state
       macro::false
       (
@@ -31,7 +31,7 @@ let add_builtins
                     switch (Js.Null.to_opt threadInfo) {
                     | None =>
                       return (
-                        Common.AST.create_exception "THREAD/names failed because of getThreadInfo.",
+                        Common.AST.create_exception "Thread.names failed because of getThreadInfo.",
                         state
                       )
                     | Some threadInfo =>
@@ -43,7 +43,7 @@ let add_builtins
                             switch (Js.Null.to_opt users) {
                             | None =>
                               return (
-                                Common.AST.create_exception "THREAD/names failed because of getUserInfo.",
+                                Common.AST.create_exception "Thread.names failed because of getUserInfo.",
                                 state
                               )
                             | Some users =>
@@ -71,13 +71,13 @@ let add_builtins
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::0 ::args name::"THREAD/names" ::state
+                expected::0 ::args name::"Thread.names" ::state
             )
           }
       );
   let state =
     BuiltinHelper.add_native_lambda_async
-      "THREAD/ids"
+      "Thread.ids"
       ::state
       macro::false
       (
@@ -94,7 +94,7 @@ let add_builtins
                     switch (Js.Null.to_opt threadInfo) {
                     | None =>
                       return (
-                        Common.AST.create_exception "THREAD/ids failed because of getThreadInfo.",
+                        Common.AST.create_exception "Thread.ids failed because of getThreadInfo.",
                         state
                       )
                     | Some threadInfo =>
@@ -120,13 +120,13 @@ let add_builtins
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::0 ::args name::"THREAD/ids" ::state
+                expected::0 ::args name::"Thread.ids" ::state
             )
           }
       );
   let state =
     BuiltinHelper.add_native_lambda_async
-      "THREAD/message"
+      "Thread.send"
       ::state
       macro::false
       (
@@ -142,7 +142,7 @@ let add_builtins
                   switch (Js.Null.to_opt msgInfo) {
                   | None =>
                     return (
-                      Common.AST.create_exception "THREAD/message failed.",
+                      Common.AST.create_exception "Thread.send failed.",
                       state
                     )
                   | Some _ => return (Ok (List []), state)
@@ -150,19 +150,19 @@ let add_builtins
               )
           | [_, _] =>
             return (
-              AST.create_exception "Expected 2 strings (id, msg) in call to THREAD/message.",
+              AST.create_exception "Expected 2 strings (id, msg) in call to Thread.send.",
               state
             )
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::2 ::args name::"THREAD/message" ::state
+                expected::2 ::args name::"Thread.send" ::state
             )
           }
       );
   let state =
     BuiltinHelper.add_native_lambda
-      "LISTEN/list"
+      "Listen.list"
       ::state
       macro::false
       (
@@ -193,12 +193,12 @@ let add_builtins
             }
           | _ =>
             BuiltinHelper.received_error
-              expected::1 ::args name::"LISTEN/list" ::state
+              expected::1 ::args name::"Listen.list" ::state
           }
       );
   let state =
     BuiltinHelper.add_native_lambda_async
-      "LISTEN/add"
+      "Listen.add"
       ::state
       macro::false
       (
@@ -227,19 +227,19 @@ let add_builtins
             }
           | [_, _, _] =>
             return (
-              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to LISTEN/add.",
+              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to Listen.add.",
               state
             )
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::1 ::args name::"LISTEN/add" ::state
+                expected::1 ::args name::"Listen.add" ::state
             )
           }
       );
   let state =
     BuiltinHelper.add_native_lambda_async
-      "LISTEN/remove"
+      "Listen.remove"
       ::state
       macro::false
       (
@@ -263,13 +263,13 @@ let add_builtins
             }
           | [_, _, _] =>
             return (
-              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to LISTEN/add.",
+              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to Listen.add.",
               state
             )
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::1 ::args name::"LISTEN/remove" ::state
+                expected::1 ::args name::"Listen.remove" ::state
             )
           }
       );
@@ -278,4 +278,4 @@ let add_builtins
 
 let add_threadid_to_builtins threadid state =>
   Evaluate.Eval.define_native_symbol
-    state "THREAD/id" (Some "Id of the current thread.") (Str threadid);
+    state "Thread.id" (Some "Id of the current thread.") (Str threadid);
