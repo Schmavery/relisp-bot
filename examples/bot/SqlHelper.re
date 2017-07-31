@@ -118,7 +118,10 @@ let load_uuidmap (db: Sqlite.t) (cb: StringMap.t AST.astNodeT => unit) =>
           | None => StringMap.empty
           | Some rows =>
             Array.fold_left
-              (fun map [|k, v|] => StringMap.add k (Persist.from_string v) map)
+              (
+                fun map v =>
+                  StringMap.add v##id (Persist.from_string v##node) map
+              )
               StringMap.empty
               rows
           }
@@ -137,7 +140,9 @@ let load_refmap (db: Sqlite.t) (cb: StringMap.t uuidT => unit) =>
           | None => StringMap.empty
           | Some rows =>
             Array.fold_left
-              (fun map [|k, v|] => StringMap.add k v map) StringMap.empty rows
+              (fun map v => StringMap.add v##refId v##uuid map)
+              StringMap.empty
+              rows
           }
         )
     );
@@ -157,12 +162,15 @@ let load_listen
           | Some rows =>
             Array.fold_left
               (
-                fun map [|threadId, name, pattern, uuid|] =>
+                fun map row =>
                   Common.StringMapHelper.update_default
-                    threadId
+                    row##threadId
                     map
                     default::StringMap.empty
-                    (fun v => StringMap.add name (pattern, uuid) v)
+                    (
+                      fun v =>
+                        StringMap.add row##name (row##pattern, row##uuid) v
+                    )
               )
               StringMap.empty
               rows

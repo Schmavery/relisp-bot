@@ -14,7 +14,7 @@ module Regex = {
 
 let baseSymbols = Builtins.add_builtins Eval.empty;
 
-let db = Sqlite.database ":memory:";
+let db = Sqlite.database "data.db";
 
 let persist_data db threadid (state: Common.AST.evalStateT) ::cb => {
   SqlHelper.put_usertable

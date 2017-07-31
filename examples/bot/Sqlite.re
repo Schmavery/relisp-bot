@@ -9,7 +9,7 @@ external run : t => string => Js.t 'a => (err => unit) => unit =
   "" [@@bs.send];
 
 external all :
-  t => string => Js.t 'a => (err => Js.Undefined.t (array (array 'b)) => unit) => unit =
+  t => string => Js.t 'a => (err => Js.Undefined.t (array 'b) => unit) => unit =
   "" [@@bs.send];
 
 external get :
