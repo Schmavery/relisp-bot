@@ -602,10 +602,26 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             switch args {
             | [Ident i] =>
               switch (Evaluate.Eval.resolve_ident_with_docs i ctx state) {
-              | None => (
-                  AST.create_exception ("Undeclared identifier [" ^ i ^ "]."),
-                  state
-                )
+              | None =>
+                switch (EvalState.find_closest_idents state i) {
+                | [] => (
+                    AST.create_exception (
+                      "Undeclared identifier [" ^ i ^ "]."
+                    ),
+                    state
+                  )
+                | suggestions =>
+                  let formatted_suggestions =
+                    String.concat
+                      ", " (List.map (fun s => "[" ^ s ^ "]") suggestions);
+                  (
+                    AST.create_exception (
+                      "Undeclared identifier [" ^
+                      i ^ "]. Did you mean " ^ formatted_suggestions ^ "?"
+                    ),
+                    state
+                  )
+                }
               | Some (None, _) => (Ok (Str "No docs"), state)
               | Some (Some docs, _) => (Ok (Str docs), state)
               }

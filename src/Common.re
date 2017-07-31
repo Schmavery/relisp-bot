@@ -14,6 +14,42 @@ let gen_uuid () => {
   s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
 };
 
+module StringCmp = {
+  let minimum a b c => min a (min b c);
+  /* Calculates Levenshtein distance: number of changes to turn
+   * string s into string t. Lower score = more similar strings. */
+  let distance s t => {
+    let m = String.length s
+    and n =
+      String.length t; /* for all i and j, d.(i).(j) will hold the Levenshtein distance between
+     the first i characters of s and the first j characters of t */
+    let d = Array.make_matrix (m + 1) (n + 1) 0;
+    for i in 0 to m {
+      d.(i).(0) =
+        i /* the distance of any first string to an empty second string */
+    };
+    for j in 0 to n {
+      d.(0).(j) =
+        j /* the distance of any second string to an empty first string */
+    };
+    for j in 1 to n {
+      for i in 1 to m {
+        if (s.[i - 1] == t.[j - 1]) {
+          d.(i).(j) = d.(i - 1).(j - 1)
+        } else {
+          /* no operation required */
+          d.(i).(j) =
+            minimum
+              (d.(i - 1).(j) + 1) /* a deletion */
+              (d.(i).(j - 1) + 1) /* an insertion */
+              (d.(i - 1).(j - 1) + 1) /* a substitution */
+        }
+      }
+    };
+    d.(m).(n)
+  };
+};
+
 module StringMap = Map.Make String;
 
 module StringMapHelper = {
@@ -88,6 +124,38 @@ module EvalState = {
     "UserTable:" ^
     StringMap.fold
       (fun k (_d, v) a => a ^ k ^ ":\t" ^ v ^ "\n") state.userTable "";
+  let search_map map ident input :option (int, list string) =>
+    StringMap.fold
+      (
+        fun new_ident _uuid acc => {
+          let dist = StringCmp.distance ident new_ident;
+          switch acc {
+          | None => Some (dist, [new_ident])
+          | Some (score, suggestions) as curr =>
+            if (score > dist) {
+              Some (dist, [new_ident])
+            } else if (
+              score == dist
+            ) {
+              Some (dist, [new_ident, ...suggestions])
+            } else {
+              curr
+            }
+          }
+        }
+      )
+      map
+      input;
+  let find_closest_idents state ident :list string => {
+    let results =
+      search_map state.userTable ident None |>
+      search_map state.symbolTable ident;
+    switch results {
+    | Some (score, suggestions) when score < 10 => suggestions
+    | None
+    | Some _ => []
+    }
+  };
 };
 
 module type AST_Type = {

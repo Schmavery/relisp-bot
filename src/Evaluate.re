@@ -151,10 +151,23 @@ module Eval: EvalT = {
       switch (resolve_ident ident ctx state) {
       | Some resolved => cb (Ok resolved, state)
       | None =>
-        cb (
-          AST.create_exception ("Undeclared identifier [" ^ ident ^ "]."),
-          state
-        )
+        switch (EvalState.find_closest_idents state ident) {
+        | [] =>
+          cb (
+            AST.create_exception ("Undeclared identifier [" ^ ident ^ "]."),
+            state
+          )
+        | suggestions =>
+          let formatted_suggestions =
+            String.concat ", " (List.map (fun s => "[" ^ s ^ "]") suggestions);
+          cb (
+            AST.create_exception (
+              "Undeclared identifier [" ^
+              ident ^ "]. Did you mean " ^ formatted_suggestions ^ "?"
+            ),
+            state
+          )
+        }
       }
     | List lst =>
       switch lst {
