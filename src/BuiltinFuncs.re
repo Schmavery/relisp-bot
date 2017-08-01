@@ -686,22 +686,16 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 },
                 state
               )
+            | [_] => (
+                AST.create_exception "Expected ref in call to deref",
+                state
+              )
             | lst => received_error expected::1 args::lst name::"deref" ::state
             }
         );
     let state =
-      add_native_lambda
-        ::state
-        "Map.make"
-        macro::false
-        (
-          fun args ctx::_ ::state =>
-            switch args {
-            | [] => (Ok (Map ASTMap.empty), state)
-            | lst =>
-              received_error expected::0 args::lst name::"Map.make" ::state
-            }
-        );
+      Evaluate.Eval.define_native_symbol
+        state "Map.empty" (Some "Empty map.") (Map ASTMap.empty);
     let state =
       add_native_lambda
         ::state
@@ -721,6 +715,10 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                   state
                 )
               }
+            | [_, _] => (
+                AST.create_exception "Expected map, key in call to Map.get",
+                state
+              )
             | lst =>
               received_error expected::2 args::lst name::"Map.get" ::state
             }
@@ -734,8 +732,64 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [Map map, key, v] => (Ok (Map (ASTMap.add key v map)), state)
+            | [_, _, _] => (
+                AST.create_exception "Expected map, key, value in call to Map.add",
+                state
+              )
             | lst =>
               received_error expected::3 args::lst name::"Map.add" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "Map.len"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Map map] => (
+                Ok (Num (float_of_int (ASTMap.cardinal map))),
+                state
+              )
+            | [_] => (
+                AST.create_exception "Expected map in call to Map.len",
+                state
+              )
+            | lst =>
+              received_error expected::1 args::lst name::"Map.len" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "Map.entries"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Map map] => (
+                Ok (
+                  List (
+                    ASTMap.fold
+                      (
+                        fun k v (acc: list AST.astNodeT) => [
+                          List [k, v],
+                          ...acc
+                        ]
+                      )
+                      map
+                      []
+                  )
+                ),
+                state
+              )
+            | [_] => (
+                AST.create_exception "Expected map in call to Map.entries",
+                state
+              )
+            | lst =>
+              received_error expected::1 args::lst name::"Map.entries" ::state
             }
         );
     let state =
@@ -747,6 +801,10 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [Map map, key] => (Ok (Map (ASTMap.remove key map)), state)
+            | [_, _] => (
+                AST.create_exception "Expected map, key in call to Map.remove",
+                state
+              )
             | lst =>
               received_error expected::2 args::lst name::"Map.remove" ::state
             }
