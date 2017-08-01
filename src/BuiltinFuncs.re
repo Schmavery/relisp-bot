@@ -144,13 +144,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           | Error e => (AST.create_exception e, state)
           }
         }
-      | [_, _] => (
-          AST.create_exception (
-            "Expected list as first argument in call to '" ^ func_name ^ "'"
-          ),
-          state
-        )
-      | args => received_error expected::2 ::args name::func_name ::state
+      | args =>
+        received_error
+          expected::["args:list", "body:list"] ::args name::func_name ::state
       }
     };
     let state =
@@ -167,7 +163,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [a] => (Error ([], a), state)
-            | lst => received_error expected::2 args::lst name::"throw" ::state
+            | lst =>
+              received_error_num expected::1 args::lst name::"throw" ::state
             }
         );
     let state =
@@ -210,7 +207,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                   | x => return x
                 )
             | lst =>
-              return (received_error expected::2 args::lst name::"try" ::state)
+              return (
+                received_error_num expected::2 args::lst name::"try" ::state
+              )
             }
         );
     let state =
@@ -272,7 +271,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
               )
             | lst =>
               return (
-                received_error expected::2 args::lst name::"define" ::state
+                received_error_num expected::2 args::lst name::"define" ::state
               )
             }
         );
@@ -287,7 +286,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [el] => (Ok el, state)
-            | lst => received_error expected::1 args::lst name::"quote" ::state
+            | lst =>
+              received_error_num expected::1 args::lst name::"quote" ::state
             }
         );
     let state =
@@ -301,7 +301,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             | [el] => Eval.eval el ::ctx ::state cb::return
             | lst =>
               return (
-                received_error expected::1 args::lst name::"unquote" ::state
+                received_error_num
+                  expected::1 args::lst name::"unquote" ::state
               )
             }
         );
@@ -364,7 +365,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
       switch node {
       | List [Ident "unquote", next] => Eval.eval next ::ctx ::state cb::return
       | List [Ident "unquote", ...lst] =>
-        return (received_error expected::1 args::lst name::"unquote" ::state)
+        return (
+          received_error_num expected::1 args::lst name::"unquote" ::state
+        )
       | List lst =>
         traverseH
           lst
@@ -389,7 +392,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             | [e] => traverse e ::ctx ::state cb::return
             | lst =>
               return (
-                received_error
+                received_error_num
                   expected::1 args::lst name::"syntax-quote" ::state
               )
             }
@@ -422,7 +425,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                     }
                 )
             | lst =>
-              return (received_error expected::3 args::lst name::"if" ::state)
+              return (
+                received_error_num expected::3 args::lst name::"if" ::state
+              )
             }
         );
     let rec eval_list
@@ -482,14 +487,10 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                       }
                     }
                 )
-            | [_] =>
-              return (
-                AST.create_exception "Expected string as first argument in call to 'load'",
-                state
-              )
             | lst =>
               return (
-                received_error expected::1 args::lst name::"load" ::state
+                received_error
+                  expected::["string"] args::lst name::"load" ::state
               )
             }
         );
@@ -528,7 +529,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             switch args {
             | [e1, e2] => (Ok (Bool (equal_helper e1 e2)), state)
             | lst =>
-              received_error expected::2 args::lst name::"equal?" ::state
+              received_error_num expected::2 args::lst name::"equal?" ::state
             }
         );
 
@@ -546,14 +547,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 AST.create_exception "Called 'car' on empty list",
                 state
               )
-            | [e] => (
-                AST.create_exception (
-                  "Expected list in call to 'car', got [" ^
-                  Stringify.string_of_ast (Ok e) state ^ "] instead."
-                ),
-                state
-              )
-            | lst => received_error expected::1 args::lst name::"car" ::state
+            | lst =>
+              received_error expected::["list"] args::lst name::"car" ::state
             }
         );
     let state =
@@ -569,11 +564,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 AST.create_exception "Called 'cdr' on empty list",
                 state
               )
-            | [_] => (
-                AST.create_exception "Expected list in call to 'cdr'",
-                state
-              )
-            | lst => received_error expected::1 args::lst name::"cdr" ::state
+            | lst =>
+              received_error expected::["list"] args::lst name::"cdr" ::state
             }
         );
     let state =
@@ -585,11 +577,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [el, List lst] => (Ok (List [el, ...lst]), state)
-            | [_, _] => (
-                AST.create_exception "Expected list as second arg in call to 'cons'",
-                state
-              )
-            | lst => received_error expected::2 args::lst name::"cons" ::state
+            | lst =>
+              received_error
+                expected::["any", "list"] args::lst name::"cons" ::state
             }
         );
     let state =
@@ -625,11 +615,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
               | Some (None, _) => (Ok (Str "No docs"), state)
               | Some (Some docs, _) => (Ok (Str docs), state)
               }
-            | [_] => (
-                AST.create_exception "Expected ident in call to 'docs'",
-                state
-              )
-            | lst => received_error expected::1 args::lst name::"docs" ::state
+            | lst =>
+              received_error expected::["ident"] args::lst name::"docs" ::state
             }
         );
 
@@ -648,7 +635,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
               let state = Common.EvalState.add_to_uuidmap a hash state;
               let state = Common.EvalState.update_ref refId hash state;
               (Ok (Ref refId), state)
-            | lst => received_error expected::1 args::lst name::"ref" ::state
+            | lst =>
+              received_error_num expected::1 args::lst name::"ref" ::state
             }
         );
     let state =
@@ -664,7 +652,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
               let state = Common.EvalState.add_to_uuidmap a hash state;
               let state = Common.EvalState.update_ref refId hash state;
               (Ok (List []), state)
-            | lst => received_error expected::1 args::lst name::"set!" ::state
+            | lst =>
+              received_error
+                expected::["ref", "any"] args::lst name::"set!" ::state
             }
         );
     let state =
@@ -686,11 +676,8 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 },
                 state
               )
-            | [_] => (
-                AST.create_exception "Expected ref in call to deref",
-                state
-              )
-            | lst => received_error expected::1 args::lst name::"deref" ::state
+            | lst =>
+              received_error expected::["ref"] args::lst name::"deref" ::state
             }
         );
     let state =
@@ -715,12 +702,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                   state
                 )
               }
-            | [_, _] => (
-                AST.create_exception "Expected map, key in call to Map.get",
-                state
-              )
             | lst =>
-              received_error expected::2 args::lst name::"Map.get" ::state
+              received_error
+                expected::["map", "key"] args::lst name::"Map.get" ::state
             }
         );
     let state =
@@ -732,12 +716,12 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [Map map, key, v] => (Ok (Map (ASTMap.add key v map)), state)
-            | [_, _, _] => (
-                AST.create_exception "Expected map, key, value in call to Map.add",
-                state
-              )
             | lst =>
-              received_error expected::3 args::lst name::"Map.add" ::state
+              received_error
+                expected::["map", "key", "value"]
+                args::lst
+                name::"Map.add"
+                ::state
             }
         );
     let state =
@@ -752,12 +736,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 Ok (Num (float_of_int (ASTMap.cardinal map))),
                 state
               )
-            | [_] => (
-                AST.create_exception "Expected map in call to Map.len",
-                state
-              )
             | lst =>
-              received_error expected::1 args::lst name::"Map.len" ::state
+              received_error
+                expected::["map"] args::lst name::"Map.len" ::state
             }
         );
     let state =
@@ -784,12 +765,9 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 ),
                 state
               )
-            | [_] => (
-                AST.create_exception "Expected map in call to Map.entries",
-                state
-              )
             | lst =>
-              received_error expected::1 args::lst name::"Map.entries" ::state
+              received_error
+                expected::["map"] args::lst name::"Map.entries" ::state
             }
         );
     let state =
@@ -801,12 +779,46 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
           fun args ctx::_ ::state =>
             switch args {
             | [Map map, key] => (Ok (Map (ASTMap.remove key map)), state)
-            | [_, _] => (
-                AST.create_exception "Expected map, key in call to Map.remove",
-                state
-              )
             | lst =>
-              received_error expected::2 args::lst name::"Map.remove" ::state
+              received_error
+                expected::["map", "key"] args::lst name::"Map.remove" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
+        "String.join"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [Str sep, List lst] =>
+              let maybeStrs =
+                List.fold_right
+                  (
+                    fun (v: AST.astNodeT) acc =>
+                      switch (acc, v) {
+                      | (Some acc, Str s) => Some [s, ...acc]
+                      | _ => None
+                      }
+                  )
+                  lst
+                  (Some []);
+              switch maybeStrs {
+              | Some strs => (Ok (Str (String.concat sep strs)), state)
+              | None =>
+                received_error
+                  expected::["sep:string", "list of strings"]
+                  ::args
+                  name::"String.join"
+                  ::state
+              }
+            | _ =>
+              received_error
+                expected::["sep:string", "list of strings"]
+                ::args
+                name::"String.join"
+                ::state
             }
         );
 
@@ -839,7 +851,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
               print_endline (Common.EvalState.to_string state);
               (Ok (List []), state)
             | lst =>
-              received_error
+              received_error_num
                 expected::0 args::lst name::"Debug.print-state" ::state
             }
         );
@@ -871,15 +883,10 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                     | Error _ as e => cb (e, initial_state)
                     }
                 )
-            | [_] =>
-              cb (
-                AST.create_exception "Expected list in call to 'Debug.expand-macro",
-                initial_state
-              )
             | lst =>
               cb (
                 received_error
-                  expected::0
+                  expected::["list"]
                   args::lst
                   name::"Debug.expand-macro"
                   state::initial_state

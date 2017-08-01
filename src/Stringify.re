@@ -71,3 +71,16 @@ and string_of_ast
     }
   | Error ex => string_of_exception ex state
   };
+
+let string_of_type (node: AST.astNodeT) :string =>
+  switch node {
+  | Ident _ => "ident"
+  | Str _ => "string"
+  | Num _ => "number"
+  | Bool _ => "boolean"
+  | Ref _ => "ref"
+  | Map _ => "map"
+  | List _ => "list"
+  | Func _ => "function"
+  | NativeFunc _ => "native function"
+  };

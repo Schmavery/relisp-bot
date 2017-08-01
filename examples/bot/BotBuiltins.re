@@ -70,7 +70,7 @@ let add_builtins
             ()
           | _ =>
             return (
-              BuiltinHelper.received_error
+              BuiltinHelper.received_error_num
                 expected::0 ::args name::"Thread.names" ::state
             )
           }
@@ -119,7 +119,7 @@ let add_builtins
             ()
           | _ =>
             return (
-              BuiltinHelper.received_error
+              BuiltinHelper.received_error_num
                 expected::0 ::args name::"Thread.ids" ::state
             )
           }
@@ -148,15 +148,13 @@ let add_builtins
                   | Some _ => return (Ok (List []), state)
                   }
               )
-          | [_, _] =>
-            return (
-              AST.create_exception "Expected 2 strings (id, msg) in call to Thread.send.",
-              state
-            )
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::2 ::args name::"Thread.send" ::state
+                expected::["id:string", "msg:string"]
+                ::args
+                name::"Thread.send"
+                ::state
             )
           }
       );
@@ -192,8 +190,8 @@ let add_builtins
             | None => (id_not_loaded_ex, state)
             }
           | _ =>
-            BuiltinHelper.received_error
-              expected::1 ::args name::"Listen.list" ::state
+            BuiltinHelper.received_error_num
+              expected::0 ::args name::"Listen.list" ::state
           }
       );
   let state =
@@ -225,15 +223,13 @@ let add_builtins
                 )
             | None => return (id_not_loaded_ex, state)
             }
-          | [_, _, _] =>
-            return (
-              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to Listen.add.",
-              state
-            )
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::1 ::args name::"Listen.add" ::state
+                expected::["name:string", "pattern:string", "function"]
+                ::args
+                name::"Listen.add"
+                ::state
             )
           }
       );
@@ -261,15 +257,10 @@ let add_builtins
                 )
             | None => return (id_not_loaded_ex, state)
             }
-          | [_, _, _] =>
-            return (
-              AST.create_exception "Expected 2 strings and 1 function (name, pattern, handler) in call to Listen.add.",
-              state
-            )
           | _ =>
             return (
               BuiltinHelper.received_error
-                expected::1 ::args name::"Listen.remove" ::state
+                expected::["name:string"] ::args name::"Listen.remove" ::state
             )
           }
       );
