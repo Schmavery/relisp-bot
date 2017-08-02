@@ -152,7 +152,7 @@ let load_listen
     (cb: StringMap.t (StringMap.t (string, uuidT)) => unit) =>
   Sqlite.all
     db
-    "SELECT threadId, name, pattern, uuid FROM RefMap"
+    "SELECT threadId, name, pattern, uuid FROM Listens"
     (Js.Obj.empty ())
     (
       fun _ rows =>
@@ -254,10 +254,10 @@ let process_actions
             }
           | UpdateRef (refId, uuid) => (
               "INSERT INTO RefMap ('refId', 'uuid') VALUES ($1, $2)",
-              {"$1": refId, "$2": Persist.to_string uuid}
+              {"$1": refId, "$2": uuid}
             )
           }
       )
       state.recentActions;
-  insert_multiple db queries cb ()
+  insert_multiple db (List.rev queries) cb ()
 };

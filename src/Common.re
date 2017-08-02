@@ -8,7 +8,7 @@ type refIdT = string;
 
 type docsT = option string;
 
-let gen_uuid () => {
+let generate_unique_identifier () => {
   let s4 () => Printf.sprintf "%04x" (Random.int 65536);
   s4 () ^
   s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ "-" ^ s4 () ^ s4 () ^ s4 ()
@@ -102,10 +102,10 @@ module EvalState = {
     refMap: StringMap.empty,
     recentActions: []
   };
-  let update_ref ref_id new_val state :t 'a => {
+  let update_ref (ref_id: refIdT) (hash: uuidT) state :t 'a => {
     ...state,
-    refMap: StringMap.add ref_id new_val state.refMap,
-    recentActions: [UpdateRef (ref_id, new_val), ...state.recentActions]
+    refMap: StringMap.add ref_id hash state.refMap,
+    recentActions: [UpdateRef (ref_id, hash), ...state.recentActions]
   };
   let add_to_uuidmap (node: 'a) (uuid: uuidT) state :t 'a => {
     ...state,

@@ -631,7 +631,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
             switch args {
             | [a] =>
               let hash = Hash.hash a;
-              let refId = Common.gen_uuid ();
+              let refId = Common.generate_unique_identifier ();
               let state = Common.EvalState.add_to_uuidmap a hash state;
               let state = Common.EvalState.update_ref refId hash state;
               (Ok (Ref refId), state)
@@ -821,24 +821,6 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
                 ::state
             }
         );
-
-    /** Debug functions */
-    /* let state = */
-    /*   add_native_lambda */
-    /*     ::state */
-    /*     "DEBUG/print-scope" */
-    /*     macro::false */
-    /*     ( */
-    /*       fun args ctx::_ ::state => */
-    /*         switch args { */
-    /*         | [Func {scope}] => */
-    /*           print_endline (StringMapHelper.to_string scope); */
-    /*           (Ok (List []), state) */
-    /*         | lst => */
-    /*           received_error */
-    /*             expected::1 args::lst name::"DEBUG/print-scope" ::state */
-    /*         } */
-    /*     ); */
     let state =
       add_native_lambda
         ::state
@@ -860,9 +842,7 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
         (
           fun args ctx::_ ::state =>
             switch args {
-            | [] =>
-              print_endline (Common.EvalState.to_string state);
-              (Ok (List []), state)
+            | [] => (Ok (Str (Common.EvalState.to_string state)), state)
             | lst =>
               received_error_num
                 expected::0 args::lst name::"Debug.print-state" ::state
