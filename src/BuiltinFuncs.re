@@ -842,6 +842,19 @@ module Builtins (Environment: BuiltinHelper.EnvironmentT) => {
     let state =
       add_native_lambda
         ::state
+        "to-string"
+        macro::false
+        (
+          fun args ctx::_ ::state =>
+            switch args {
+            | [a] => (Ok (Str (Stringify.string_of_ast (Ok a) state)), state)
+            | _ =>
+              received_error_num expected::1 ::args name::"to-string" ::state
+            }
+        );
+    let state =
+      add_native_lambda
+        ::state
         "Debug.print-state"
         macro::false
         (
